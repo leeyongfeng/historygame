@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
@@ -1993,7 +1993,7 @@ function createDynastyCardEl(dynasty) {
     '<span class="corner tl"></span><span class="corner tr"></span>' +
     '<span class="corner bl"></span><span class="corner br"></span>' +
     '<span class="card-chip">朝代</span>' +
-    '<div class="dyn-illu"><img class="card-img" draggable="false" src="assets/' + dynasty.id + '.png" alt="' + dynasty.name + '" onerror="imgFallback(this, \'' + emoji + '\')" /></div>' +
+    '<div class="dyn-illu"><img class="card-img" draggable="false" src="assets/' + dynasty.id + '.jpg" alt="' + dynasty.name + '" onerror="imgFallback(this, \'' + emoji + '\')" /></div>' +
     '<div class="dyn-name">' + dynasty.name + '</div>' +
     '<span class="orn-bar bottom"></span>';
   el.appendChild(createInfoBtn('dynasty', dynasty.id));
@@ -2011,7 +2011,7 @@ function createEventCardEl(event) {
   el.innerHTML =
     '<span class="evt-orn top"></span>' +
     '<span class="card-chip">' + chip + '</span>' +
-    '<div class="evt-illu"><img class="card-img" draggable="false" src="assets/' + event.id + '.png" alt="' + event.name + '" onerror="imgFallback(this, \'' + emoji + '\')" /></div>' +
+    '<div class="evt-illu"><img class="card-img" draggable="false" src="assets/' + event.id + '.jpg" alt="' + event.name + '" onerror="imgFallback(this, \'' + emoji + '\')" /></div>' +
     '<div class="evt-name">' + event.name + '</div>' +
     '<span class="evt-orn bottom"></span>';
   el.appendChild(createInfoBtn('event', event.id));
@@ -2029,7 +2029,7 @@ function createPersonCardEl(person) {
   const chip = '人物';
   el.innerHTML =
     '<span class="card-chip">' + chip + '</span>' +
-    '<div class="per-illu"><img class="card-img" draggable="false" src="assets/' + person.personId + '.png" alt="' + person.name + '" onerror="imgFallback(this, \'' + emoji + '\')" /></div>' +
+    '<div class="per-illu"><img class="card-img" draggable="false" src="assets/' + person.personId + '.jpg" alt="' + person.name + '" onerror="imgFallback(this, \'' + emoji + '\')" /></div>' +
     '<div class="pname">' + person.name + '</div>';
   el.appendChild(createInfoBtn('person', person.personId));
   el.addEventListener('click', () => { if (el._suppressClick) { el._suppressClick = false; return; } handlePersonClick(person.personId); });
@@ -2679,7 +2679,7 @@ function buildCardPool() {
   PERSON_CARDS.forEach((p) => pool.push({ id: p.personId, kind: 'person', name: p.name, eventId: (p.eventIds || [p.eventId])[0], eventIds: p.eventIds }));
   pool.forEach((c) => {
     c.sortKey = sortKeyOf(c);
-    c.img = 'assets/' + c.id + '.png';
+    c.img = 'assets/' + c.id + '.jpg';
   });
   return pool;
 }
@@ -3154,7 +3154,7 @@ function memCardById(id) {
 
 /**
  * 从全部事件卡中随机抽取 n 张（默认 18），映射为玩法卡对象。
- * 字段映射：t←name, e←DYNASTY_NAMES[dynastyId], s←description, y←year, img←'assets/<id>.png'
+ * 字段映射：t←name, e←DYNASTY_NAMES[dynastyId], s←description, y←year, img←'assets/<id>.jpg'
  * 仅保留 typeof year === 'number' 的卡；不足 n 时取全部。
  */
 function memDrawCards(n) {
@@ -3170,7 +3170,7 @@ function memDrawCards(n) {
         s: e.description || '',
         y: e.year,
         d: e.dynastyId,
-        img: 'assets/' + e.id + '.png',
+        img: 'assets/' + e.id + '.jpg',
       });
     });
   });
@@ -3221,7 +3221,7 @@ function memRebuildGrid() {
     slot.style.setProperty('--i', index);
     slot.innerHTML =
       '<div class="card-inner">' +
-        '<div class="card-face card-back"><img class="card-back-img" src="assets/card-back.png" alt="卡背"></div>' +
+        '<div class="card-face card-back"><img class="card-back-img" src="assets/card-back.jpg" alt="卡背"></div>' +
         '<div class="card-face card-front">' +
           '<img class="card-img" src="' + c.img + '" alt="' + c.t + '" draggable="false" ' +
             'onerror="imgFallback(this, \'' + emoji + '\')">' +
