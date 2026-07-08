@@ -1,0 +1,3512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>华夏朝代配对闯关</title>
+<style>
+  /* =========================================================
+     国风视觉规范（复刻 React 源码 DynastyCardsSection /
+     EventCardsSection 的配色与观感，纯 CSS 实现，无插画依赖）
+     ========================================================= */
+  :root {
+    --paper: #F5EFE0;          /* 宣纸米黄底色 */
+    --title: #2C2416;          /* 标题墨黑 */
+    --body: #4A3F2E;           /* 正文深褐 */
+    --secondary: #7A6B52;      /* 简介/年代 */
+    --accent: #C41E3A;         /* 强调朱红 */
+    --gold: #DAA520;           /* 装饰赤金 */
+    --border-dyn: #8B7355;     /* 朝代卡常态边框 */
+    --border-evt: #C4B59A;     /* 事件卡常态边框 */
+    --card-bg: #FAF6EB;        /* 事件卡宣纸底 */
+    --glow: rgba(218, 165, 32, 0.5);
+    --overlay-gold: rgba(218, 165, 32, 0.08);
+    --card-w: 180px;          /* 四类卡牌（朝代/人物/事件/时间线）统一外宽，竖版 3:4 共享尺寸 */
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    font-family: "Songti SC", "STSong", "SimSun", "Noto Serif CJK SC", "KaiTi", "STKaiti", serif;
+    color: var(--title);
+    background:
+      radial-gradient(circle at 18% 12%, rgba(139, 115, 85, 0.10), transparent 42%),
+      radial-gradient(circle at 82% 22%, rgba(74, 63, 46, 0.08), transparent 40%),
+      radial-gradient(circle at 50% 88%, rgba(196, 30, 58, 0.05), transparent 46%),
+      var(--paper);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .screen { display: block; }
+  .screen[hidden] { display: none; }
+
+  /* ---------- 首页 ---------- */
+  #home {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 40px 20px 60px;
+    text-align: center;
+  }
+  #home h1 {
+    font-size: 38px;
+    letter-spacing: 8px;
+    margin: 18px 0 6px;
+    color: var(--title);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  }
+  .home-sub {
+    color: var(--secondary);
+    letter-spacing: 4px;
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+  .home-stats {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    margin: 18px 0 28px;
+    flex-wrap: wrap;
+  }
+  .stat-chip {
+    border: 1px solid var(--border-dyn);
+    background: rgba(250, 246, 235, 0.7);
+    border-radius: 8px;
+    padding: 10px 18px;
+    min-width: 120px;
+  }
+  .stat-chip .label { font-size: 12px; color: var(--secondary); letter-spacing: 2px; }
+  .stat-chip .value { font-size: 24px; color: var(--gold); font-weight: 700; }
+
+  .mode-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin-top: 10px;
+  }
+  @media (max-width: 520px) { .mode-grid { grid-template-columns: 1fr; } }
+
+  .mode-card {
+    border: 2px solid var(--border-dyn);
+    background: var(--card-bg);
+    border-radius: 10px;
+    padding: 18px 14px;
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  }
+  .mode-card:hover { transform: translateY(-3px); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12); border-color: var(--gold); }
+  .mode-card .icon { font-size: 30px; }
+  .mode-card .name { font-size: 18px; letter-spacing: 3px; margin: 6px 0 4px; }
+  .mode-card .desc { font-size: 12px; color: var(--secondary); line-height: 1.5; }
+  .mode-card .sub { margin-top: 10px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .pill {
+    border: 1px solid var(--border-dyn);
+    border-radius: 16px;
+    padding: 4px 12px;
+    font-size: 13px;
+    color: var(--body);
+    cursor: pointer;
+    background: rgba(245, 239, 224, 0.6);
+    transition: all 0.3s ease;
+  }
+  .pill:hover { border-color: var(--gold); color: var(--gold); }
+
+  .lowpower-row {
+    margin-top: 26px;
+    font-size: 13px;
+    color: var(--secondary);
+    letter-spacing: 1px;
+  }
+  .lowpower-row label { cursor: pointer; user-select: none; }
+  .lowpower-row input { width: 16px; height: 16px; vertical-align: -3px; margin-right: 6px; accent-color: var(--gold); }
+
+  /* ---------- 游戏 HUD ---------- */
+  #game { max-width: 1000px; margin: 0 auto; padding: 14px 16px 60px; }
+
+  .hud {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--border-evt);
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+  }
+  .hud .spacer { flex: 1; }
+  .hud-info { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .hud-tag {
+    border: 1px solid var(--border-dyn);
+    background: rgba(250, 246, 235, 0.7);
+    border-radius: 8px;
+    padding: 6px 12px;
+    font-size: 13px;
+    letter-spacing: 1px;
+    color: var(--body);
+  }
+  .hud-tag b { color: var(--gold); font-size: 16px; }
+  .hud-tag.accent b { color: var(--accent); }
+  .hud-tag.combo b { color: #1f8a4c; }
+
+  .btn {
+    border: 2px solid var(--border-dyn);
+    background: var(--card-bg);
+    color: var(--title);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 14px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease, background 0.3s ease;
+  }
+  .btn:hover { border-color: var(--gold); box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1); }
+  .btn:active { transform: scale(0.96); }
+  .btn.primary { background: var(--gold); color: #fff; border-color: var(--gold); }
+  .btn.danger { border-color: var(--accent); color: var(--accent); }
+
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    color: var(--secondary);
+    margin: 16px 0 10px;
+  }
+
+  /* ---------- 道具栏 ---------- */
+  .items-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .item-btn {
+    border: 1.5px dashed var(--border-dyn);
+    background: rgba(250, 246, 235, 0.6);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
+    color: var(--body);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.3s ease;
+  }
+  .item-btn:hover:not(:disabled) { border-style: solid; border-color: var(--gold); color: var(--gold); }
+  .item-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .item-btn .cost { color: var(--accent); font-weight: 700; }
+  .item-btn .used { font-size: 11px; color: var(--secondary); }
+
+  /* ---------- 朝代卡 ---------- */
+  .dynasty-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: center;
+  }
+  .dynasty-card {
+    position: relative;
+    width: var(--card-w);
+    display: flex;
+    flex-direction: column;
+    aspect-ratio: 3 / 4;
+    border: 2px solid var(--border-dyn);
+    border-radius: 4px;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 22% 18%, rgba(255,255,255,0.45), transparent 38%),
+      radial-gradient(circle at 80% 82%, rgba(139,115,85,0.06), transparent 42%),
+      linear-gradient(180deg, rgba(255,255,255,0.2), transparent 32%),
+      var(--paper);
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+    will-change: transform;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  }
+  /* 朝代卡外宽统一为 --card-w，桌面端不再放大，保持与人物/事件卡同宽 */
+  .dynasty-card:hover { transform: translateY(-3px) scale(1.02); }
+  .dynasty-card.selected {
+    border-color: var(--gold);
+    box-shadow: 0 0 20px var(--glow), 0 4px 16px rgba(0, 0, 0, 0.1);
+    transform: scale(1.04);
+  }
+  .dynasty-card::after { /* 选中淡金蒙版 */
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--overlay-gold);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .dynasty-card.selected::after { opacity: 1; }
+
+  .orn-bar {
+    position: absolute;
+    left: 0; right: 0; height: 9px;
+    z-index: 7;
+    background: linear-gradient(180deg, #6B5638, #5C4A2E 55%, #463722);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    transition: background 0.3s ease;
+  }
+  .orn-bar::before, .orn-bar::after {
+    content: "";
+    position: absolute;
+    top: -1px;
+    width: 7px;
+    height: 11px;
+    background: linear-gradient(180deg, #ECC94B, #DAA520 55%, #B8860B);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+  }
+  .orn-bar::before { left: 0; border-radius: 3px 0 0 3px; }
+  .orn-bar::after { right: 0; border-radius: 0 3px 3px 0; }
+  .orn-bar.top { top: 0; }
+  .orn-bar.bottom { bottom: 0; }
+  .dynasty-card.selected .orn-bar { background: linear-gradient(180deg, #ECC94B, #DAA520 55%, #B8860B); }
+  .corner {
+    position: absolute;
+    width: 8px; height: 8px;
+    border-color: rgba(139,115,85,0.5);
+    z-index: 6;
+    transition: border-color 0.3s ease;
+  }
+  .corner.tl { top: 4px; left: 4px; border-top: 2px solid; border-left: 2px solid; }
+  .corner.tr { top: 4px; right: 4px; border-top: 2px solid; border-right: 2px solid; }
+  .corner.bl { bottom: 4px; left: 4px; border-bottom: 2px solid; border-left: 2px solid; }
+  .corner.br { bottom: 4px; right: 4px; border-bottom: 2px solid; border-right: 2px solid; }
+  .dynasty-card.selected .corner { border-color: rgba(218,165,32,0.6); }
+
+  .dyn-name {
+    position: relative;
+    z-index: 4;
+    text-align: center;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 4px;
+    padding: 10px 4px 2px;
+    color: var(--title);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+    transition: text-shadow 0.3s ease;
+  }
+  .dynasty-card.selected .dyn-name { text-shadow: 0 0 8px rgba(218,165,32,0.3), 0 1px 3px rgba(0,0,0,0.25); }
+  .dyn-illu {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 0 10px;
+    border: 1px solid rgba(139,115,85,0.28);
+    border-radius: 3px;
+    overflow: hidden;
+    background: #F5EFE0;
+    box-shadow: inset 0 0 10px rgba(139,115,85,0.14);
+  }
+  .dyn-tag {
+    position: relative;
+    z-index: 4;
+    text-align: center;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--secondary);
+    padding: 2px 4px;
+  }
+  .dyn-period {
+    position: relative;
+    z-index: 4;
+    text-align: center;
+    font-size: 9px;
+    color: var(--secondary);
+    line-height: 1.3;
+    padding: 1px 4px 10px;
+  }
+
+  /* ---------- 人物卡（连锁用） ---------- */
+  .person-section[hidden] { display: none; }
+  .person-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .person-card {
+    position: relative;
+    width: var(--card-w);
+    display: flex;
+    flex-direction: column;
+    aspect-ratio: 3 / 4;
+    border: 2px solid var(--border-dyn);
+    border-radius: 4px;
+    background:
+      radial-gradient(circle at 50% 0%, rgba(255,255,255,0.4), transparent 55%),
+      var(--card-bg);
+    padding: 8px;
+    text-align: center;
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+    will-change: transform;
+  }
+  .person-card:hover { transform: translateY(-2px); }
+  .person-card.selected { border-color: var(--gold); box-shadow: 0 0 16px var(--glow); transform: scale(1.04); }
+  .person-card .pname { font-size: 16px; font-weight: 700; color: var(--title); letter-spacing: 2px; }
+  .person-card .ptag { font-size: 10px; color: var(--secondary); margin-top: 3px; line-height: 1.4; }
+  .per-illu {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
+    margin: 0 4px 6px;
+    border: 1px solid rgba(139,115,85,0.28);
+    border-radius: 3px;
+    overflow: hidden;
+    background: #F5EFE0;
+    box-shadow: inset 0 0 8px rgba(139,115,85,0.14);
+  }
+  /* 人物单人竖照：锚定顶部，保证头顶完整显示在卡内（仍保持 cover + 4:3） */
+  .person-card .card-img { object-position: top; }
+
+  /* ---------- 事件卡 ---------- */
+  .event-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, var(--card-w));
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .event-card {
+    position: relative;
+    width: var(--card-w);
+    justify-self: center;
+    display: flex;
+    flex-direction: column;
+    aspect-ratio: 3 / 4;
+    border: 2px solid var(--border-evt);
+    border-radius: 4px;
+    overflow: hidden;
+    background:
+      radial-gradient(circle at 50% 100%, rgba(255,255,255,0.35), transparent 55%),
+      var(--card-bg);
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease, opacity 0.3s ease;
+    will-change: transform;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
+  .event-card:hover { transform: translateY(-2px) scale(1.02); }
+  .event-card.selected { border-color: var(--gold); box-shadow: 0 0 16px var(--glow); }
+  .event-card.success { border-color: var(--gold); box-shadow: 0 0 20px var(--glow); }
+  .event-card.removing { opacity: 0; transform: scale(0.6); pointer-events: none; }
+
+  .evt-name {
+    position: relative;
+    z-index: 3;
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--title);
+    padding: 10px 10px 4px;
+    text-align: center;
+  }
+  .evt-illu {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 0 10px;
+    border: 1px solid rgba(139,115,85,0.22);
+    border-radius: 3px;
+    overflow: hidden;
+    background: #F5EFE0;
+    box-shadow: inset 0 0 10px rgba(139,115,85,0.12);
+  }
+  .evt-desc {
+    position: relative;
+    z-index: 3;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--secondary);
+    padding: 4px 10px 8px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .evt-year {
+    position: relative;
+    z-index: 3;
+    text-align: right;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--accent);
+    padding: 2px 10px 10px;
+  }
+  .evt-orn {
+    position: absolute;
+    left: 0; right: 0; height: 6px;
+    background: linear-gradient(180deg, #6B5638, #5C4A2E 55%, #463722);
+    z-index: 6;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  }
+  .evt-orn::before, .evt-orn::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    width: 5px;
+    height: 6px;
+    background: linear-gradient(90deg, #ECC94B, #DAA520);
+  }
+  .evt-orn::before { left: 0; border-radius: 2px 0 0 2px; }
+  .evt-orn::after { right: 0; border-radius: 0 2px 2px 0; }
+  .evt-orn.top { top: 0; }
+  .evt-orn.bottom { bottom: 0; }
+  .event-card.success .evt-orn { background: linear-gradient(180deg, #ECC94B, #DAA520 55%, #B8860B); }
+  .event-card.success .evt-orn::before, .event-card.success .evt-orn::after { background: #ECC94B; }
+
+  /* 成功淡金蒙版 */
+  .success-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    pointer-events: none;
+    background: rgba(218, 165, 32, 0.2);
+    opacity: 1;
+    animation: fadeOut 0.4s ease forwards;
+  }
+  @keyframes fadeOut { to { opacity: 0; } }
+
+  /* 成功粒子（精简） */
+  .particle {
+    position: absolute;
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--gold);
+    z-index: 9;
+    pointer-events: none;
+    left: 50%; top: 50%;
+    animation: particleFly 0.5s ease-out forwards;
+  }
+  @keyframes particleFly {
+    to { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
+  }
+
+  /* 错误抖动（GPU 加速 transform） */
+  .shake { animation: shake 0.35s ease; border-color: #ef4444 !important; }
+  @keyframes shake {
+    0% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-6px); }
+    80% { transform: translateX(6px); }
+    100% { transform: translateX(0); }
+  }
+
+  /* 提示脉冲 */
+  .hint { animation: hintPulse 0.9s ease-in-out infinite; border-color: var(--gold) !important; }
+  @keyframes hintPulse {
+    0%, 100% { box-shadow: 0 0 0 rgba(218,165,32,0); }
+    50% { box-shadow: 0 0 18px rgba(218,165,32,0.85); }
+  }
+
+  /* 时间线提示模式：拾取高亮 + 可点提示 */
+  .hint-pick {
+    border-color: var(--gold) !important;
+    box-shadow: 0 0 0 3px rgba(218,165,32,0.55), 0 6px 16px rgba(0,0,0,0.25);
+    transform: scale(1.04);
+  }
+  .hint-mode .tl-card { cursor: help; }
+  .btn.disabled { opacity: 0.45; cursor: not-allowed; pointer-events: auto; }
+
+  /* 浮动分数 */
+  .float-score {
+    position: absolute;
+    left: 50%;
+    top: 45%;
+    z-index: 20;
+    font-size: 22px;
+    font-weight: 900;
+    pointer-events: none;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    transform: translate(-50%, 0);
+    animation: floatUp 0.8s ease-out forwards;
+  }
+  .float-score.plus { color: var(--gold); }
+  .float-score.minus { color: var(--accent); }
+  @keyframes floatUp {
+    0% { opacity: 1; transform: translate(-50%, 0); }
+    100% { opacity: 0; transform: translate(-50%, -50px); }
+  }
+
+  /* ---------- 弹窗 ---------- */
+  #modal-layer { position: fixed; inset: 0; z-index: 100; pointer-events: none; }
+  #modal-layer:not(:empty) { pointer-events: auto; }
+  .modal-mask {
+    position: fixed;
+    inset: 0;
+    background: rgba(44, 36, 22, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: fadeIn 0.25s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .modal {
+    background: var(--paper);
+    border: 2px solid var(--gold);
+    border-radius: 12px;
+    max-width: 420px;
+    width: 100%;
+    padding: 26px 24px;
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+    animation: popIn 0.3s ease;
+  }
+  @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .modal h2 { font-size: 24px; letter-spacing: 4px; margin: 4px 0 14px; color: var(--title); }
+  .modal .modal-icon { font-size: 40px; }
+  .modal .modal-line { font-size: 15px; color: var(--body); margin: 8px 0; line-height: 1.6; }
+  .modal .modal-line b { color: var(--gold); font-size: 20px; }
+  .modal .modal-btns { margin-top: 18px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 0;
+    color: var(--secondary);
+  }
+  .empty-state .big { font-size: 40px; margin-bottom: 10px; }
+
+  /* ---------- 任务一：共享卡图（统一尺寸 + onerror 兜底） ---------- */
+  .card-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    background: #F5EFE0;
+    -webkit-user-drag: none;
+    user-drag: none;
+  }
+  .dyn-illu.no-img::after,
+  .evt-illu.no-img::after,
+  .per-illu.no-img::after,
+  .tl-illu.no-img::after {
+    content: attr(data-emoji);
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 34px;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+    pointer-events: none;
+  }
+
+  /* ---------- 任务四：卡片类型标签 chip（信息层级） ---------- */
+  .card-chip {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    z-index: 9;
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    color: #F5EFE0;
+    background: rgba(44, 36, 22, 0.62);
+    border: 1px solid rgba(218, 165, 32, 0.5);
+    pointer-events: none;
+  }
+
+  /* 叹号信息标记：悬于卡牌右上角，点击展开更多故事弹窗（不触发拖拽/选中） */
+  .card-info-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    z-index: 12;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(218, 165, 32, 0.75);
+    background: rgba(44, 36, 22, 0.82);
+    color: #F5EFE0;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: inherit;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+    transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+  }
+  .card-info-btn:hover { background: var(--gold); color: #2C2416; transform: scale(1.12); }
+  .card-info-btn:active { transform: scale(0.94); }
+
+  /* ---------- 任务二：历史时间线模式 ---------- */
+  #timeline { max-width: 1000px; margin: 0 auto; padding: 14px 16px 60px; display: flex; flex-direction: column; justify-content: center; min-height: 100vh; }
+  #timeline[hidden] { display: none; }
+  .tl-tip { color: var(--secondary); font-size: 13px; text-align: center; margin: 6px 0 16px; letter-spacing: 1px; }
+  .tl-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, var(--card-w));
+    justify-content: center;
+    gap: 14px;
+    margin-bottom: 26px;
+  }
+  .tl-card {
+    position: relative;
+    width: var(--card-w);
+    display: flex;
+    flex-direction: column;
+    aspect-ratio: 3 / 4;
+    border: 2px solid var(--border-evt);
+    border-radius: 6px;
+    background: radial-gradient(circle at 50% 100%, rgba(255,255,255,0.35), transparent 55%), var(--card-bg);
+    overflow: hidden;
+    cursor: pointer;
+    user-select: none;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+    will-change: transform;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+  .tl-card:hover { transform: translateY(-3px); }
+  .tl-card.selected { border-color: var(--gold); box-shadow: 0 0 18px var(--glow); transform: scale(1.03); }
+  .tl-card.solved { border-color: var(--gold); box-shadow: 0 0 18px var(--glow); }
+  .tl-illu {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 0;
+    border-bottom: 1px solid rgba(139,115,85,0.22);
+    background: #F5EFE0;
+    overflow: hidden;
+  }
+  .tl-name {
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--title);
+    padding: 8px 6px 2px;
+    letter-spacing: 1px;
+  }
+  .tl-year {
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    display: none;
+  }
+  .tl-card:hover .tl-year,
+  .tl-card.solved .tl-year { display: block; }
+
+  /* 时间线轨道 */
+  .tl-track { position: relative; margin-top: 10px; padding: 24px 10px 8px; }
+  .tl-axis {
+    position: absolute;
+    left: 16px; right: 16px; top: 34px;
+    height: 3px;
+    background: rgba(139,115,85,0.35);
+    border-radius: 2px;
+  }
+  .tl-track.active .tl-axis { background: linear-gradient(90deg, var(--border-dyn), var(--gold)); }
+  .tl-ticks { position: relative; height: 38px; }
+  .tl-tick {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+    text-align: center;
+    width: max-content;
+    max-width: 64px;
+  }
+  .tl-tick-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--gold);
+    border: 2px solid var(--paper);
+    box-shadow: 0 0 8px var(--glow);
+    margin: 0 auto 4px;
+  }
+  .tl-tick-label { font-size: 10px; color: var(--body); line-height: 1.2; }
+
+  /* 轻提示 toast */
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 32px;
+    transform: translateX(-50%) translateY(20px);
+    background: rgba(44, 36, 22, 0.9);
+    color: #F5EFE0;
+    padding: 10px 20px;
+    border-radius: 22px;
+    font-size: 14px;
+    letter-spacing: 1px;
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---------- 任务四：弹窗卷轴质感 ---------- */
+  .modal { position: relative; }
+  .modal::before, .modal::after {
+    content: "";
+    position: absolute;
+    top: -8px; bottom: -8px;
+    width: 12px;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #ECC94B, #DAA520 50%, #B8860B);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+    z-index: 1;
+  }
+  .modal::before { left: -8px; }
+  .modal::after { right: -8px; }
+
+  /* ---------- 任务四：拖拽交互辅助样式（零依赖） ---------- */
+  .dragging-source { opacity: 0.35; transform: scale(0.98); }
+  .drag-ghost {
+    position: fixed;
+    pointer-events: none;
+    opacity: 0.85;
+    z-index: 999;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+  }
+
+  /* =========================================================
+     记忆时序玩法（朝代学宫） —— 全部选择器限定在 #memory 作用域
+     ========================================================= */
+  #memory {
+    --mem-gold: #D4AF37;
+    --mem-gold-2: #b8902b;
+    --mem-red: #C0392B;
+    --mem-green: #2E8B57;
+    --mem-bg-dark: #1f1812;
+    --mem-paper: #F5EFE0;
+    --mem-body: #4A3F2E;
+    position: relative;
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 18px 16px 40px;
+  }
+  /* hidden 属性兜底：覆盖下方 display 规则，确保初始隐藏 */
+  #memory .mem-banner[hidden],
+  #memory .mem-toast[hidden],
+  #memory .mem-modal-overlay[hidden] { display: none; }
+
+  /* 进度条 */
+  #memory .mem-prog {
+    position: relative;
+    height: 22px;
+    background: rgba(0, 0, 0, 0.18);
+    border: 1px solid var(--mem-gold-2);
+    border-radius: 12px;
+    overflow: hidden;
+    margin: 12px 0 6px;
+  }
+  #memory .mem-prog-fill {
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 0%;
+    background: linear-gradient(90deg, var(--mem-gold-2), var(--mem-gold));
+    transition: width .4s ease;
+  }
+  #memory .mem-prog-text {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    letter-spacing: 1px;
+  }
+
+  /* 回想阶段提示横幅：悬浮于顶部，不占据正常流，网格不再下移 */
+  #memory .mem-banner {
+    position: fixed;
+    top: 64px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    width: min(560px, 92%);
+    background: rgba(31, 24, 18, 0.92);
+    border: 1px solid var(--mem-gold);
+    border-radius: 12px;
+    padding: 10px 16px;
+    text-align: center;
+    color: var(--mem-paper);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+  #memory .mem-banner .bI { font-size: 26px; line-height: 1; }
+  #memory .mem-banner .bT { font-size: 16px; font-weight: bold; color: var(--mem-gold); letter-spacing: 2px; }
+  #memory .mem-banner .bS { font-size: 15px; margin-top: 2px; }
+  #memory .mem-banner .bC { font-size: 12px; opacity: .8; margin-top: 2px; }
+
+  /* 卡牌网格 */
+  #memory .mem-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 10px;
+    margin-top: 14px;
+  }
+  #memory .card-slot {
+    position: relative;
+    aspect-ratio: 3 / 4;
+    perspective: 800px;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: transform .25s ease, box-shadow .25s ease;
+  }
+  #memory .card-slot:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 10px 22px rgba(0,0,0,.35);
+  }
+  #memory .card-inner {
+    position: absolute;
+    inset: 0;
+    transform-style: preserve-3d;
+    transition: transform .55s cubic-bezier(.2,.8,.3,1);
+  }
+  #memory .card-slot.flipped .card-inner,
+  #memory .card-slot.done .card-inner { transform: rotateY(180deg); }
+  #memory .card-face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  }
+  #memory .card-back {
+    background: var(--mem-bg-dark);
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--mem-gold-2);
+  }
+  #memory .card-back-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+  #memory .card-front {
+    transform: rotateY(180deg);
+    background: var(--mem-paper);
+    border: 2px solid var(--mem-gold);
+    padding: 4px;
+    align-items: stretch;
+    display: flex;
+    flex-direction: column;
+  }
+  #memory .card-face::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 60%;
+    height: 100%;
+    z-index: 3;
+    pointer-events: none;
+    background: linear-gradient(105deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.6) 50%, rgba(255,255,255,0) 100%);
+    opacity: 0;
+    transform: translateX(0) rotate(8deg);
+    transition: opacity .3s ease, transform .55s cubic-bezier(.2,.8,.3,1);
+  }
+  #memory .card-slot:hover .card-face::before {
+    opacity: .45;
+    transform: translateX(45%) rotate(8deg);
+  }
+  #memory .card-front .card-img {
+    width: 100%;
+    height: auto;
+    flex: 1 1 auto;
+    min-height: 0;
+    object-fit: cover;
+    border-radius: 6px 6px 0 0;
+    background: #e9e0cf;
+    -webkit-user-drag: none;
+    user-drag: none;
+  }
+  #memory .card-name {
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--mem-body);
+    text-align: center;
+    margin-top: 4px;
+    line-height: 1.1;
+  }
+  #memory .card-chip {
+    align-self: center;
+    margin-top: 3px;
+    font-size: 11px;
+    color: #fff;
+    background: var(--mem-gold-2);
+    border-radius: 8px;
+    padding: 1px 8px;
+  }
+  #memory .card-sub {
+    font-size: 10px;
+    color: #7A6B52;
+    text-align: center;
+    margin-top: 3px;
+    padding: 0 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  #memory .card-slot.done { cursor: default; }
+  #memory .card-slot.done .card-front {
+    border-color: var(--mem-green);
+    box-shadow: 0 0 0 2px var(--mem-green), 0 2px 6px rgba(0, 0, 0, 0.25);
+  }
+  #memory .card-slot.done::after {
+    content: '✓';
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    z-index: 9;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(46,125,50,.85);
+    color: #fff;
+    font-weight: bold;
+    border: 2px solid #fff;
+  }
+  #memory .card-slot.wrong .card-front {
+    border-color: var(--mem-red);
+    box-shadow: 0 0 0 2px var(--mem-red), 0 2px 6px rgba(0, 0, 0, 0.25);
+  }
+  #memory .card-slot.ans-hint .card-front {
+    border-color: var(--mem-green);
+    box-shadow: 0 0 0 2px var(--mem-green), 0 2px 6px rgba(0, 0, 0, 0.25);
+  }
+  /* 插画加载失败兜底（复用全局 imgFallback 的 .no-img 约定） */
+  #memory .card-front.no-img .card-img { display: none; }
+  #memory .card-front.no-img::after {
+    content: attr(data-emoji);
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+    pointer-events: none;
+  }
+
+  /* 成就 toast */
+  #memory .mem-toast {
+    position: fixed;
+    left: 50%;
+    top: 80px;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, var(--mem-gold), var(--mem-gold-2));
+    color: #2a2118;
+    border-radius: 14px;
+    padding: 10px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    z-index: 60;
+    animation: mem-pop .4s ease;
+  }
+  #memory .mem-toast .tI { font-size: 24px; }
+  #memory .mem-toast .tT { font-size: 14px; font-weight: bold; }
+  #memory .mem-toast .tS { font-size: 12px; opacity: .85; }
+  @keyframes mem-pop {
+    0% { transform: translateX(-50%) translateY(-16px) scale(.9); opacity: 0; }
+    100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+  }
+  @keyframes memPop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.08); }
+    100% { transform: scale(1); }
+  }
+  @keyframes memShake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-6px); }
+    40% { transform: translateX(6px); }
+    60% { transform: translateX(-4px); }
+    80% { transform: translateX(4px); }
+  }
+  @keyframes memPulse {
+    0%, 100% { box-shadow: 0 0 0 2px var(--mem-green), 0 2px 6px rgba(0,0,0,.25); }
+    50% { box-shadow: 0 0 0 5px var(--mem-green), 0 4px 12px rgba(0,0,0,.3); }
+  }
+  @keyframes memDeal {
+    from { opacity: 0; transform: translateY(-22px) rotateZ(-3deg); }
+    to { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    #memory .card-slot {
+      animation: memDeal .5s cubic-bezier(.2,.8,.3,1) backwards;
+      animation-delay: calc(var(--i, 0) * 45ms);
+    }
+    #memory .card-slot.done { animation: memPop .45s ease; }
+    #memory .card-slot.done::after { animation: memPop .45s ease; }
+    #memory .card-slot.wrong { animation: memShake .4s ease; }
+    #memory .card-slot.ans-hint { animation: memPulse .6s ease 2; }
+  }
+
+  /* 结果 / 结算弹窗 */
+  #memory .mem-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 80;
+    padding: 16px;
+  }
+  #memory .mem-modal {
+    background: var(--mem-paper);
+    border: 2px solid var(--mem-gold);
+    border-radius: 16px;
+    max-width: 420px;
+    width: 100%;
+    padding: 22px 20px;
+    text-align: center;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  }
+  #memory .mem-modal .mI { font-size: 46px; line-height: 1; }
+  #memory .mem-modal .mT { font-size: 20px; font-weight: bold; color: var(--mem-body); margin: 6px 0; letter-spacing: 2px; }
+  #memory .mem-modal .mB { font-size: 14px; color: var(--mem-body); line-height: 1.6; margin: 6px 0; }
+  #memory .mem-modal .mD { font-size: 13px; color: #7A6B52; margin: 6px 0 14px; line-height: 1.5; }
+  #memory .mem-modal .mBtns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+  /* 响应式断点（选择器已加 #memory 前缀） */
+  @media (max-width: 760px) {
+    #memory .mem-grid { grid-template-columns: repeat(4, 1fr); }
+  }
+  @media (max-width: 480px) {
+    #memory .mem-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+</style>
+</head>
+<body>
+  <!-- ===================== 首页 ===================== -->
+  <header id="home" class="screen">
+    <h1>华夏朝代配对闯关</h1>
+    <div class="home-sub">点卡配对 · 连锁进阶 · 限时竞速</div>
+
+    <div class="home-stats">
+      <div class="stat-chip">
+        <div class="label">历史最高分</div>
+        <div class="value" id="home-best">0</div>
+      </div>
+      <div class="stat-chip">
+        <div class="label">点卡总额</div>
+        <div class="value" id="home-dianka">0</div>
+      </div>
+    </div>
+
+    <div class="mode-grid">
+      <div class="mode-card" id="mode-chapter">
+        <div class="icon">📜</div>
+        <div class="name">章节闯关</div>
+        <div class="desc">商周 → 春秋战国 → 秦汉 → 汉晋<br/>隋唐 → 五代宋 → 元明 → 清（8 章）</div>
+      </div>
+      <div class="mode-card" id="mode-timed">
+        <div class="icon">⏱️</div>
+        <div class="name">限时速配</div>
+        <div class="desc">倒计时内匹配全部事件卡</div>
+        <div class="sub">
+          <span class="pill" data-dur="60">60 秒</span>
+          <span class="pill" data-dur="90">90 秒</span>
+        </div>
+      </div>
+      <div class="mode-card" id="mode-timeline">
+        <div class="icon">🕰️</div>
+        <div class="name">历史时间线</div>
+        <div class="desc">抽取五张卡，按史实时间从早到晚排好顺序</div>
+      </div>
+      <div class="mode-card" id="mode-memory">
+        <div class="icon">🧠</div>
+        <div class="name">记忆时序</div>
+        <div class="desc">翻两张记牌，凭记忆选出时间更早的事件<br/>每次随机 18 张 · 统一卡背</div>
+      </div>
+    </div>
+
+    <div class="lowpower-row">
+      <label><input type="checkbox" id="lowpower-toggle" /> 低配模式（关闭光效 / 粒子 / 震动）</label>
+    </div>
+  </header>
+
+  <!-- ===================== 游戏页 ===================== -->
+  <section id="game" class="screen" hidden>
+    <div class="hud">
+      <button class="btn" id="back-btn">← 首页</button>
+      <div class="hud-info">
+        <span class="hud-tag" id="mode-label">—</span>
+        <span class="hud-tag">得分 <b id="score-label">0</b></span>
+        <span class="hud-tag accent">点卡 <b id="dianka-label">0</b></span>
+        <span class="hud-tag" id="timer-label" hidden>⏱ <b id="timer-num">0</b>s</span>
+        <span class="hud-tag combo" id="combo-label" hidden>连击 x<b id="combo-num">0</b></span>
+      </div>
+      <span class="spacer"></span>
+      <button class="btn danger" id="reset-btn">重置</button>
+    </div>
+
+    <div class="items-bar">
+      <button class="item-btn" data-item="hint">溯源提示 <span class="cost">15</span> <span class="used" id="used-hint">(0/3)</span></button>
+      <button class="item-btn" data-item="clear">清除连线 <span class="cost">10</span> <span class="used" id="used-clear">(0/3)</span></button>
+      <button class="item-btn" data-item="shuffle">洗牌重置 <span class="cost">20</span> <span class="used" id="used-shuffle">(0/3)</span></button>
+    </div>
+
+    <h2 class="section-title">🏛️ 朝代卡牌 — 请先选择朝代（或先点事件卡）</h2>
+    <div class="dynasty-row" id="dynasty-row"></div>
+
+    <section class="person-section" id="person-row-wrap" hidden>
+      <h2 class="section-title">👤 人物卡 — 选中朝代后可点人物组成连锁</h2>
+      <div class="person-row" id="person-row"></div>
+    </section>
+
+    <h2 class="section-title" id="event-hint">📜 事件卡牌</h2>
+    <div class="event-grid" id="event-grid"></div>
+  </section>
+
+  <!-- ===================== 时间线页 ===================== -->
+  <section id="timeline" class="screen" hidden>
+    <div class="hud">
+      <button class="btn" id="tl-back">← 首页</button>
+      <div class="hud-info">
+        <span class="hud-tag">🕰️ 历史时间线</span>
+        <span class="hud-tag">得分 <b id="tl-score">0</b></span>
+        <span class="hud-tag accent">点卡 <b id="tl-dianka">0</b></span>
+      </div>
+      <span class="spacer"></span>
+      <button class="btn primary" id="tl-check">校验顺序</button>
+      <button class="btn" id="tl-hint">💡 提示 (<span id="tl-hint-left">2</span>/2)</button>
+      <button class="btn danger" id="tl-restart">重抽</button>
+    </div>
+    <p class="tl-tip">点选卡高亮后点另一张可交换；或点「提示」依次点两张卡比较先后。排好后点「校验顺序」。</p>
+    <div class="tl-grid" id="tl-grid"></div>
+    <div class="tl-track" id="tl-track">
+      <div class="tl-axis"></div>
+      <div class="tl-ticks" id="tl-ticks"></div>
+    </div>
+  </section>
+
+  <!-- ===================== 记忆时序页（朝代学宫） ===================== -->
+  <section id="memory" class="screen" hidden>
+    <div class="hud">
+      <button class="btn" id="mem-back">← 首页</button>
+      <div class="hud-info">
+        <span class="hud-tag">🧠 记忆时序</span>
+        <span class="hud-tag">正确 <b id="mem-scoreR">0</b></span>
+        <span class="hud-tag accent">错误 <b id="mem-scoreW">0</b></span>
+        <span class="hud-tag combo">连击 x<b id="mem-streakN">0</b></span>
+        <span class="hud-tag">准确率 <b id="mem-accN">0%</b></span>
+      </div>
+      <span class="spacer"></span>
+      <button class="btn danger" id="mem-restart">重开</button>
+    </div>
+
+    <div class="mem-prog">
+      <div class="mem-prog-fill" id="mem-prog-fill"></div>
+      <div class="mem-prog-text" id="mem-prog-text">0 / 18</div>
+    </div>
+
+    <div class="mem-banner" id="mem-banner" hidden>
+      <div class="bI" id="mem-bI">🧠</div>
+      <div class="bT" id="mem-bT">回想阶段</div>
+      <div class="bS" id="mem-bS">哪张卡的事件更早？</div>
+      <div class="bC" id="mem-bC"></div>
+    </div>
+
+    <div class="mem-grid" id="mem-grid"></div>
+
+    <div class="mem-toast" id="mem-toast" hidden>
+      <div class="tI" id="mem-tI">🔥</div>
+      <div class="tT" id="mem-tT">连击里程碑</div>
+      <div class="tS" id="mem-tS"></div>
+    </div>
+
+    <div class="mem-modal-overlay" id="mem-modal-overlay" hidden>
+      <div class="mem-modal">
+        <div class="mI" id="mem-mI">🎉</div>
+        <div class="mT" id="mem-mT">提示</div>
+        <div class="mB" id="mem-mB"></div>
+        <div class="mD" id="mem-mD"></div>
+        <div class="mBtns" id="mem-mBtns"></div>
+      </div>
+    </div>
+  </section>
+
+  <div id="modal-layer"></div>
+
+<script>
+/* =====================================================================
+ *  华夏朝代配对闯关 —— 纯原生 JS 单文件实现
+ *  数据忠于 React 源码 levels.ts / dynasty-images.ts（tagline 原样移植）
+ *  插画私有 URL 不可用 → 以系统 emoji + 纯 CSS 艺术替代
+ * ===================================================================== */
+
+/* ---------------------- 1. 关卡数据（原样移植 levels.ts） ---------------------- */
+const MOCK_LEVELS = [
+  /* ============ 第 1 章 先秦·上（商周） ============ */
+  {
+    id: 1,
+    name: '先秦·上（商周）',
+    dynastyCards: [
+      { id: 'dynasty_shang', name: '商', period: '公元前1600年-公元前1046年', symbol: '甲骨文·青铜鼎', eventIds: ['event_shangtang', 'event_pangeng', 'event_wuding', 'event_fuhao', 'event_jiagu', 'event_simuwu', 'event_shangzhou', 'event_bigan', 'event_shangnong', 'event_qiangfang'] },
+      { id: 'dynasty_zhou', name: '西周', period: '公元前1046年-公元前771年', symbol: '礼乐·青铜簋', eventIds: ['event_muye', 'event_zhougong_dongzheng', 'event_zhili', 'event_fengjian', 'event_guoren', 'event_xuanwang', 'event_pingwang', 'event_jingtian', 'event_zhoumu', 'event_zhouzhao'] },
+    ],
+    eventCards: [
+      { id: 'event_shangtang', name: '商汤灭夏', description: '商汤起兵伐桀，推翻夏朝，建立商王朝', year: -1600, dynastyId: 'dynasty_shang' },
+      { id: 'event_pangeng', name: '盘庚迁殷', description: '盘庚将商都迁至殷，结束屡次迁都动荡，商代中兴', year: -1300, dynastyId: 'dynasty_shang' },
+      { id: 'event_wuding', name: '武丁中兴', description: '武丁任用贤臣，开疆拓土，商朝国力达到鼎盛', year: -1250, dynastyId: 'dynasty_shang' },
+      { id: 'event_fuhao', name: '妇好征战', description: '武丁配偶妇好领兵征伐羌方等，是中国最早女军事统帅', year: -1200, dynastyId: 'dynasty_shang' },
+      { id: 'event_jiagu', name: '甲骨文记事', description: '商代后期以甲骨刻辞占卜记事，是已知最早成熟汉字', year: -1300, dynastyId: 'dynasty_shang' },
+      { id: 'event_simuwu', name: '司母戊鼎铸造', description: '商代后期铸司母戊（后母戊）青铜方鼎，青铜工艺巅峰', year: -1200, dynastyId: 'dynasty_shang' },
+      { id: 'event_shangzhou', name: '商纣暴政', description: '帝辛（商纣）奢侈残暴，炮烙酷刑，众叛亲离', year: -1070, dynastyId: 'dynasty_shang' },
+      { id: 'event_bigan', name: '比干谏纣', description: '比干犯颜直谏，被商纣剖心杀害', year: -1047, dynastyId: 'dynasty_shang' },
+      { id: 'event_shangnong', name: '商代农牧手工业', description: '商代农业、畜牧与青铜铸造、丝织等手工业繁荣', year: -1500, dynastyId: 'dynasty_shang' },
+      { id: 'event_qiangfang', name: '羌方征伐', description: '武丁时期对羌方等方国多次征伐，甲骨卜辞多有记载', year: -1250, dynastyId: 'dynasty_shang' },
+      { id: 'event_muye', name: '武王伐纣', description: '周武王于牧野大败商军，纣王自焚，商亡周立', year: -1046, dynastyId: 'dynasty_zhou' },
+      { id: 'event_zhougong_dongzheng', name: '周公东征', description: '周公旦东征平定三监与武庚叛乱，巩固西周统治', year: -1042, dynastyId: 'dynasty_zhou' },
+      { id: 'event_zhili', name: '制礼作乐', description: '周公制礼作乐，确立宗法等级与礼乐制度', year: -1040, dynastyId: 'dynasty_zhou' },
+      { id: 'event_fengjian', name: '分封诸侯', description: '周天子分封同姓与异姓诸侯，屏藩王室', year: -1045, dynastyId: 'dynasty_zhou' },
+      { id: 'event_guoren', name: '国人暴动', description: '周厉王暴虐，国人暴动逐王，共和行政（公元前841年）', year: -841, dynastyId: 'dynasty_zhou' },
+      { id: 'event_xuanwang', name: '宣王中兴', description: '周宣王励精图治，一度复兴周室，史称宣王中兴', year: -827, dynastyId: 'dynasty_zhou' },
+      { id: 'event_pingwang', name: '平王东迁', description: '犬戎破镐京，周平王东迁洛邑，东周开始', year: -770, dynastyId: 'dynasty_zhou' },
+      { id: 'event_jingtian', name: '井田制', description: '西周推行井田制，土地国有、沟洫阡陌如井字', year: -1000, dynastyId: 'dynasty_zhou' },
+      { id: 'event_zhoumu', name: '周穆王西巡', description: '周穆王西巡天下，传说会西王母，拓宽周室影响', year: -950, dynastyId: 'dynasty_zhou' },
+      { id: 'event_zhouzhao', name: '周昭王南征', description: '周昭王南征荆楚，溺于汉水，西周南疆受挫', year: -980, dynastyId: 'dynasty_zhou' },
+    ],
+  },
+  /* ============ 第 2 章 先秦·下（春秋战国） ============ */
+  {
+    id: 2,
+    name: '先秦·下（春秋战国）',
+    dynastyCards: [
+      { id: 'dynasty_chunqiu', name: '春秋', period: '公元前770年-公元前476年', symbol: '青铜鼎', eventIds: ['event_kongzi', 'event_qihuangong', 'event_chengpu', 'event_zunwang', 'event_jinwen', 'event_chuwang', 'event_qinmu', 'event_mibing', 'event_goujian', 'event_guanzhong'] },
+      { id: 'dynasty_zhanguo', name: '战国', period: '公元前475年-公元前221年', symbol: '竹简', eventIds: ['event_shangyang', 'event_changping', 'event_baijia', 'event_hufu', 'event_hezong', 'event_jingke', 'event_dujiangyan', 'event_qinmie', 'event_guiling', 'event_maling'] },
+    ],
+    eventCards: [
+      { id: 'event_kongzi', name: '孔子周游列国', description: '孔子率弟子周游列国十四年，传播儒家思想', year: -497, dynastyId: 'dynasty_chunqiu' },
+      { id: 'event_qihuangong', name: '齐桓公称霸', description: '齐桓公任用管仲为相，成为春秋首霸', year: -685, dynastyId: 'dynasty_chunqiu' },
+      { id: 'event_chengpu', name: '城濮之战', description: '晋楚争霸的决定性战役，晋文公一战成名', year: -632, dynastyId: 'dynasty_chunqiu' },
+      { id: 'event_zunwang', name: '齐桓公尊王攘夷', description: '齐桓公以尊王攘夷为号会盟诸侯，葵丘称霸', year: -651, dynastyId: 'dynasty_chunqiu' },
+      { id: 'event_jinwen', name: '晋文公称霸', description: '晋文公城濮败楚，践土会盟，继齐桓后称霸', year: -635, dynastyId: 'dynasty_chunqiu' },
+      { id: 'event_chuwang', name: '楚庄王问鼎', description: '楚庄王北伐陆浑，问鼎中原，彰显争霸之志', year: -606, dynastyId: 'dynasty_chunqiu' },
+      { id: 'event_qinmu', name: '秦穆公霸西戎', description: '秦穆公伐西戎，益国十二，开地千里，称霸西戎', year: -623, dynastyId: 'dynasty_chunqiu' },
+      { id: 'event_mibing', name: '弭兵之会', description: '宋向戌促成晋楚弭兵之会，列强暂息兵戈', year: -546, dynastyId: 'dynasty_chunqiu' },
+      { id: 'event_goujian', name: '勾践卧薪尝胆', description: '越王勾践卧薪尝胆，终于灭吴称霸', year: -496, dynastyId: 'dynasty_chunqiu' },
+      { id: 'event_guanzhong', name: '管仲改革', description: '管仲相齐，通货积财、尊王攘夷，齐国大治', year: -685, dynastyId: 'dynasty_chunqiu' },
+      { id: 'event_shangyang', name: '商鞅变法', description: '秦国商鞅推行变法，奠定秦国强盛基础', year: -356, dynastyId: 'dynasty_zhanguo' },
+      { id: 'event_changping', name: '长平之战', description: '秦赵之间的战略决战，白起坑杀赵军四十万', year: -260, dynastyId: 'dynasty_zhanguo' },
+      { id: 'event_baijia', name: '百家争鸣', description: '诸子百家学术繁荣，思想文化空前活跃', year: -300, dynastyId: 'dynasty_zhanguo' },
+      { id: 'event_hufu', name: '胡服骑射', description: '赵武灵王改胡服、习骑射，赵国军力大增', year: -307, dynastyId: 'dynasty_zhanguo' },
+      { id: 'event_hezong', name: '合纵连横', description: '苏秦合纵六国、张仪连横破纵，外交纵横博弈', year: -334, dynastyId: 'dynasty_zhanguo' },
+      { id: 'event_jingke', name: '荆轲刺秦', description: '荆轲奉燕太子丹之命刺秦王，图穷匕见未果', year: -227, dynastyId: 'dynasty_zhanguo' },
+      { id: 'event_dujiangyan', name: '都江堰', description: '李冰父子筑都江堰，成都平原沃野千里', year: -256, dynastyId: 'dynasty_zhanguo' },
+      { id: 'event_qinmie', name: '秦灭六国序曲', description: '秦灭韩拉开统一序曲，十年间横扫六国', year: -230, dynastyId: 'dynasty_zhanguo' },
+      { id: 'event_guiling', name: '桂陵之战', description: '齐魏桂陵之战，围魏救赵，孙膑败庞涓', year: -354, dynastyId: 'dynasty_zhanguo' },
+      { id: 'event_maling', name: '马陵之战', description: '齐魏马陵之战，减灶诱敌，庞涓兵败自杀', year: -341, dynastyId: 'dynasty_zhanguo' },
+    ],
+  },
+  /* ============ 第 3 章 秦汉 ============ */
+  {
+    id: 3,
+    name: '秦汉',
+    dynastyCards: [
+      { id: 'dynasty_qin', name: '秦', period: '公元前221年-公元前207年', symbol: '长城', eventIds: ['event_tongyi', 'event_fenshu', 'event_changcheng', 'event_shutongwen', 'event_chetonggui', 'event_duliangheng', 'event_junxian', 'event_lishan', 'event_beiji_xiongnu', 'event_nanzheng'] },
+      { id: 'dynasty_xihan', name: '西汉', period: '公元前202年-公元9年', symbol: '汉瓦', eventIds: ['event_wenjing', 'event_zhangqian', 'event_qiguo', 'event_shiji', 'event_duzunrushu', 'event_weiqing', 'event_wugu', 'event_zhaogun', 'event_tuien', 'event_suwu'] },
+    ],
+    eventCards: [
+      { id: 'event_tongyi', name: '统一六国', description: '秦王嬴政灭六国，建立中国首个大一统王朝', year: -221, dynastyId: 'dynasty_qin' },
+      { id: 'event_fenshu', name: '焚书坑儒', description: '秦始皇焚毁百家著作，坑杀儒生方士', year: -213, dynastyId: 'dynasty_qin' },
+      { id: 'event_changcheng', name: '修筑长城', description: '连接北方各国城墙，抵御匈奴南下侵扰', year: -214, dynastyId: 'dynasty_qin' },
+      { id: 'event_shutongwen', name: '书同文', description: '秦统一文字，以小篆为正体，政令通行天下', year: -221, dynastyId: 'dynasty_qin' },
+      { id: 'event_chetonggui', name: '车同轨', description: '秦统一车轨宽度，修驰道，便利交通往来', year: -220, dynastyId: 'dynasty_qin' },
+      { id: 'event_duliangheng', name: '统一度量衡', description: '秦颁布标准度量衡，促进经济交流', year: -221, dynastyId: 'dynasty_qin' },
+      { id: 'event_junxian', name: '郡县制', description: '秦废分封行郡县，中央集权直辖地方', year: -221, dynastyId: 'dynasty_qin' },
+      { id: 'event_lishan', name: '修骊山陵', description: '秦始皇征发刑徒修筑骊山陵（始皇陵），耗费巨大', year: -213, dynastyId: 'dynasty_qin' },
+      { id: 'event_beiji_xiongnu', name: '北击匈奴', description: '蒙恬率军北击匈奴，收河南地，却匈奴七百余里', year: -215, dynastyId: 'dynasty_qin' },
+      { id: 'event_nanzheng', name: '南征百越', description: '秦军南平百越，置闽中、南海等郡，拓疆岭南', year: -214, dynastyId: 'dynasty_qin' },
+      { id: 'event_wenjing', name: '文景之治', description: '汉文帝与汉景帝时期轻徭薄赋，国力恢复', year: -180, dynastyId: 'dynasty_xihan' },
+      { id: 'event_zhangqian', name: '张骞出使西域', description: '张骞两次出使西域，开辟丝绸之路', year: -138, dynastyId: 'dynasty_xihan' },
+      { id: 'event_qiguo', name: '七国之乱', description: '吴楚等七国联合叛乱，被周亚夫平定', year: -154, dynastyId: 'dynasty_xihan' },
+      { id: 'event_shiji', name: '司马迁著《史记》', description: '西汉武帝时司马迁历十余年写成中国第一部纪传体通史《史记》，史家之绝唱。', year: -91, dynastyId: 'dynasty_xihan', period: '公元前104年-公元前91年' },
+      { id: 'event_duzunrushu', name: '汉武独尊儒术', description: '汉武帝采董仲舒之策，罢黜百家、独尊儒术', year: -134, dynastyId: 'dynasty_xihan' },
+      { id: 'event_weiqing', name: '卫青霍去病击匈奴', description: '卫青霍去病北击匈奴，漠北之战封狼居胥', year: -119, dynastyId: 'dynasty_xihan' },
+      { id: 'event_wugu', name: '巫蛊之祸', description: '武帝晚年巫蛊之祸，太子刘据自杀，朝局震荡', year: -91, dynastyId: 'dynasty_xihan' },
+      { id: 'event_zhaogun', name: '昭君出塞', description: '王昭君远嫁匈奴呼韩邪单于，汉匈和亲', year: -33, dynastyId: 'dynasty_xihan' },
+      { id: 'event_tuien', name: '推恩令', description: '汉武帝颁推恩令，诸侯分封子弟，削藩固权', year: -127, dynastyId: 'dynasty_xihan' },
+      { id: 'event_suwu', name: '苏武牧羊', description: '苏武出使匈奴被扣，持节牧羊十九年不屈', year: -100, dynastyId: 'dynasty_xihan' },
+    ],
+  },
+  /* ============ 第 4 章 汉晋 ============ */
+  {
+    id: 4,
+    name: '汉晋',
+    dynastyCards: [
+      { id: 'dynasty_donghan', name: '东汉', period: '公元25年-公元220年', symbol: '铜奔马', eventIds: ['event_guangwu', 'event_banchao', 'event_huangjin', 'event_cailun', 'event_zhangheng', 'event_bangu', 'event_danggu', 'event_dongzhuo', 'event_yanran', 'event_lunheng'] },
+      { id: 'dynasty_sanguo', name: '三国', period: '公元220年-公元280年', symbol: '羽扇', eventIds: ['event_chibi', 'event_guandu', 'event_sangu', 'event_yiling', 'event_zhugeliang_beifa', 'event_gaopingling', 'event_caochuan', 'event_hefei', 'event_shuiyan', 'event_sanfen_guijin'] },
+    ],
+    eventCards: [
+      { id: 'event_guangwu', name: '光武中兴', description: '刘秀建立东汉，恢复汉室，开创中兴局面', year: 25, dynastyId: 'dynasty_donghan' },
+      { id: 'event_banchao', name: '班超投笔从戎', description: '班超弃文从军，出使西域建功立业', year: 73, dynastyId: 'dynasty_donghan' },
+      { id: 'event_huangjin', name: '黄巾起义', description: '张角领导的大规模农民起义，动摇东汉根基', year: 184, dynastyId: 'dynasty_donghan' },
+      { id: 'event_cailun', name: '蔡伦改进造纸术', description: '东汉蔡伦改进造纸工艺制成“蔡侯纸”，极大推动文明传播。', year: 105, dynastyId: 'dynasty_donghan', period: '公元105年' },
+      { id: 'event_zhangheng', name: '张衡地动仪', description: '张衡发明候风地动仪，是世界最早测震仪器', year: 132, dynastyId: 'dynasty_donghan' },
+      { id: 'event_bangu', name: '班固著《汉书》', description: '班固历时数十年撰成《汉书》，首开纪传体断代史', year: 82, dynastyId: 'dynasty_donghan' },
+      { id: 'event_danggu', name: '党锢之祸', description: '东汉名士与宦官斗争，两次党锢之祸清洗清流', year: 166, dynastyId: 'dynasty_donghan' },
+      { id: 'event_dongzhuo', name: '董卓之乱', description: '董卓废立皇帝、焚洛阳，关东联军讨董，天下大乱', year: 189, dynastyId: 'dynasty_donghan' },
+      { id: 'event_yanran', name: '燕然勒功', description: '窦宪破北匈奴，登燕然山刻石记功', year: 89, dynastyId: 'dynasty_donghan' },
+      { id: 'event_lunheng', name: '王充著《论衡》', description: '东汉王充著《论衡》，倡元气自然、疾虚妄之论', year: 80, dynastyId: 'dynasty_donghan' },
+      { id: 'event_chibi', name: '赤壁之战', description: '孙刘联军火烧曹营，奠定三国鼎立局面', year: 208, dynastyId: 'dynasty_sanguo' },
+      { id: 'event_guandu', name: '官渡之战', description: '曹操以少胜多击败袁绍，统一北方', year: 200, dynastyId: 'dynasty_sanguo' },
+      { id: 'event_sangu', name: '三顾茅庐', description: '刘备三次拜访诸葛亮，请其出山辅佐', year: 207, dynastyId: 'dynasty_sanguo' },
+      { id: 'event_yiling', name: '夷陵之战', description: '刘备伐吴败于夷陵，白帝城托孤诸葛亮', year: 222, dynastyId: 'dynasty_sanguo' },
+      { id: 'event_zhugeliang_beifa', name: '诸葛亮北伐', description: '诸葛亮六出祁山北伐曹魏，鞠躬尽瘁', year: 228, dynastyId: 'dynasty_sanguo' },
+      { id: 'event_gaopingling', name: '高平陵之变', description: '司马懿发动高平陵之变，诛曹爽，掌魏权', year: 249, dynastyId: 'dynasty_sanguo' },
+      { id: 'event_caochuan', name: '草船借箭', description: '赤壁之战文学逸闻，诸葛亮草船借箭（演义虚构）', year: 208, dynastyId: 'dynasty_sanguo' },
+      { id: 'event_hefei', name: '合肥之战', description: '张辽以寡敌众守合肥，逍遥津大破孙权', year: 215, dynastyId: 'dynasty_sanguo' },
+      { id: 'event_shuiyan', name: '水淹七军', description: '关羽水淹七军，擒于禁、斩庞德，威震华夏', year: 219, dynastyId: 'dynasty_sanguo' },
+      { id: 'event_sanfen_guijin', name: '三分归晋', description: '西晋灭吴，结束三分鼎立，天下复归一统', year: 280, dynastyId: 'dynasty_sanguo' },
+    ],
+  },
+  /* ============ 第 5 章 隋唐 ============ */
+  {
+    id: 5,
+    name: '隋唐',
+    dynastyCards: [
+      { id: 'dynasty_sui', name: '隋', period: '公元581年-公元618年', symbol: '龙舟', eventIds: ['event_dayunhe', 'event_keju', 'event_tongyi_nanbei', 'event_kaihuang_zhi', 'event_gaogouli', 'event_wagang', 'event_yanmen', 'event_zhaozhou', 'event_kaihuanglv', 'event_luoyang'] },
+      { id: 'dynasty_tang', name: '唐', period: '公元618年-公元907年', symbol: '牡丹', eventIds: ['event_zhenguan', 'event_anshi', 'event_xuanzang', 'event_wuzetian', 'event_libai', 'event_kaiyuan', 'event_wencheng', 'event_jianzhen', 'event_huangchao', 'event_niuli'] },
+    ],
+    eventCards: [
+      { id: 'event_dayunhe', name: '开凿大运河', description: '隋炀帝开凿贯通南北的大运河', year: 605, dynastyId: 'dynasty_sui' },
+      { id: 'event_keju', name: '科举制度创立', description: '隋文帝创立科举制，打破门阀垄断', year: 587, dynastyId: 'dynasty_sui' },
+      { id: 'event_tongyi_nanbei', name: '统一南北', description: '隋文帝杨坚灭陈，结束南北朝分裂', year: 589, dynastyId: 'dynasty_sui' },
+      { id: 'event_kaihuang_zhi', name: '开皇之治', description: '隋文帝开皇年间轻徭薄赋，府库殷实，史称开皇之治', year: 581, dynastyId: 'dynasty_sui' },
+      { id: 'event_gaogouli', name: '三征高句丽', description: '隋炀帝三征高句丽不胜，国力大耗，民变蜂起', year: 612, dynastyId: 'dynasty_sui' },
+      { id: 'event_wagang', name: '瓦岗起义', description: '翟让、李密率瓦岗军起义，动摇隋室根基', year: 611, dynastyId: 'dynasty_sui' },
+      { id: 'event_yanmen', name: '雁门之围', description: '突厥围困巡幸雁门的隋炀帝，义成公主告变解围', year: 615, dynastyId: 'dynasty_sui' },
+      { id: 'event_zhaozhou', name: '赵州桥', description: '李春营建赵州桥（安济桥），世界现存最古敞肩石拱桥', year: 605, dynastyId: 'dynasty_sui' },
+      { id: 'event_kaihuanglv', name: '《开皇律》', description: '隋文帝颁《开皇律》，刑网简要，为唐律所本', year: 581, dynastyId: 'dynasty_sui' },
+      { id: 'event_luoyang', name: '营建东都', description: '隋炀帝营建东都洛阳，徙天下富商大族充实', year: 606, dynastyId: 'dynasty_sui' },
+      { id: 'event_zhenguan', name: '贞观之治', description: '唐太宗李世民开创的太平盛世', year: 627, dynastyId: 'dynasty_tang' },
+      { id: 'event_anshi', name: '安史之乱', description: '安禄山史思明叛乱，唐朝由盛转衰', year: 755, dynastyId: 'dynasty_tang' },
+      { id: 'event_xuanzang', name: '玄奘西行', description: '玄奘法师西行取经，历时十七年', year: 629, dynastyId: 'dynasty_tang' },
+      { id: 'event_wuzetian', name: '武则天称帝', description: '武则天改唐为周，成为中国历史上唯一正统女皇帝。', year: 690, dynastyId: 'dynasty_tang', period: '公元690年-公元705年' },
+      { id: 'event_libai', name: '李白与盛唐诗歌', description: '诗仙李白以浪漫主义诗作代表盛唐气象，传世名篇无数。', year: 740, dynastyId: 'dynasty_tang', period: '公元701年-公元762年' },
+      { id: 'event_kaiyuan', name: '开元盛世', description: '唐玄宗开元年间励精图治，国力鼎盛，史称开元盛世', year: 713, dynastyId: 'dynasty_tang' },
+      { id: 'event_wencheng', name: '文成公主入藏', description: '文成公主嫁吐蕃赞普松赞干布，汉藏和亲', year: 641, dynastyId: 'dynasty_tang' },
+      { id: 'event_jianzhen', name: '鉴真东渡', description: '鉴真六次东渡终抵日本，传律宗与唐文化', year: 753, dynastyId: 'dynasty_tang' },
+      { id: 'event_huangchao', name: '黄巢起义', description: '黄巢领导农民大起义，攻入长安建大齐，唐室衰微', year: 875, dynastyId: 'dynasty_tang' },
+      { id: 'event_niuli', name: '牛李党争', description: '牛僧孺与李德裕两党交恶，朝局党争数十年', year: 835, dynastyId: 'dynasty_tang' },
+    ],
+  },
+  /* ============ 第 6 章 五代宋 ============ */
+  {
+    id: 6,
+    name: '五代宋',
+    dynastyCards: [
+      { id: 'dynasty_wudai', name: '五代十国', period: '公元907年-公元960年', symbol: '虎符', eventIds: ['event_chenqiao', 'event_liyu', 'event_shijingtang', 'event_zhuwen', 'event_fengdao', 'event_huarui', 'event_qianliu', 'event_hanxizai', 'event_zhou_shizong', 'event_hou_tang'] },
+      { id: 'dynasty_song', name: '宋', period: '公元960年-公元1279年', symbol: '瓷器', eventIds: ['event_beijiu', 'event_jingkang', 'event_yuefei', 'event_huozi', 'event_wanganshi', 'event_shenkuo', 'event_qingli', 'event_chan_yuan', 'event_dongjing', 'event_zhuxi'] },
+    ],
+    eventCards: [
+      { id: 'event_chenqiao', name: '陈桥兵变', description: '赵匡胤陈桥驿黄袍加身，建立宋朝', year: 960, dynastyId: 'dynasty_wudai' },
+      { id: 'event_liyu', name: '南唐后主李煜', description: '南唐末代君主，千古词帝', year: 937, dynastyId: 'dynasty_wudai' },
+      { id: 'event_shijingtang', name: '儿皇帝石敬瑭', description: '后晋开国皇帝，割让燕云十六州', year: 936, dynastyId: 'dynasty_wudai' },
+      { id: 'event_zhuwen', name: '朱温建后梁', description: '朱温代唐称帝，建后梁，五代之始', year: 907, dynastyId: 'dynasty_wudai' },
+      { id: 'event_fengdao', name: '冯道历仕', description: '冯道历仕五朝八姓，自称长乐老，时议其节', year: 923, dynastyId: 'dynasty_wudai' },
+      { id: 'event_huarui', name: '花蕊夫人', description: '后蜀孟昶妃花蕊夫人，才色冠绝，亡国入宋', year: 965, dynastyId: 'dynasty_wudai' },
+      { id: 'event_qianliu', name: '钱镠吴越', description: '钱镠建吴越国，保境安民，纳土归宋', year: 907, dynastyId: 'dynasty_wudai' },
+      { id: 'event_hanxizai', name: '韩熙载夜宴', description: '南唐韩熙载夜宴宾客，《韩熙载夜宴图》传于世', year: 947, dynastyId: 'dynasty_wudai' },
+      { id: 'event_zhou_shizong', name: '周世宗改革', description: '后周世宗柴荣整军理财、伐南唐北伐，为统一奠基', year: 954, dynastyId: 'dynasty_wudai' },
+      { id: 'event_hou_tang', name: '李存勖建后唐', description: '李存勖灭后梁称帝建后唐，一时雄盛', year: 923, dynastyId: 'dynasty_wudai' },
+      { id: 'event_beijiu', name: '杯酒释兵权', description: '宋太祖赵匡胤设宴解除将领兵权', year: 961, dynastyId: 'dynasty_song' },
+      { id: 'event_jingkang', name: '靖康之耻', description: '金兵攻破汴京，掳走徽钦二帝', year: 1127, dynastyId: 'dynasty_song' },
+      { id: 'event_yuefei', name: '岳飞抗金', description: '岳飞率岳家军北伐，收复大片失地', year: 1140, dynastyId: 'dynasty_song' },
+      { id: 'event_huozi', name: '毕昇活字印刷', description: '北宋毕昇发明胶泥活字印刷术，是世界印刷史的里程碑。', year: 1040, dynastyId: 'dynasty_song', period: '公元1041年-公元1048年' },
+      { id: 'event_wanganshi', name: '王安石变法', description: '北宋王安石推行青苗、募役等新法，力图富国强兵。', year: 1069, dynastyId: 'dynasty_song', period: '公元1069年-公元1085年' },
+      { id: 'event_shenkuo', name: '沈括《梦溪笔谈》', description: '北宋沈括著《梦溪笔谈》，涵盖天文、数学、地质等诸多领域。', year: 1088, dynastyId: 'dynasty_song', period: '公元1088年' },
+      { id: 'event_qingli', name: '庆历新政', description: '范仲淹主持庆历新政，整顿吏治，未几而废', year: 1043, dynastyId: 'dynasty_song' },
+      { id: 'event_chan_yuan', name: '澶渊之盟', description: '宋辽澶渊之盟，约为兄弟，岁币换和平', year: 1004, dynastyId: 'dynasty_song' },
+      { id: 'event_dongjing', name: '东京保卫战', description: '李纲督师守东京，击退金军第一次围城', year: 1126, dynastyId: 'dynasty_song' },
+      { id: 'event_zhuxi', name: '朱熹理学', description: '朱熹集理学之大成，主张存天理灭人欲，影响深远', year: 1175, dynastyId: 'dynasty_song' },
+    ],
+  },
+  /* ============ 第 7 章 元明清（上） ============ */
+  {
+    id: 7,
+    name: '元明清（上）',
+    dynastyCards: [
+      { id: 'dynasty_yuan', name: '元', period: '公元1271年-公元1368年', symbol: '蒙古包', eventIds: ['event_chengjisi', 'event_hubilie', 'event_makeboluo', 'event_xingsheng', 'event_hongjin', 'event_guanhanqing', 'event_guoshoujing', 'event_penghu', 'event_nanpo', 'event_huangdaopo'] },
+      { id: 'dynasty_ming', name: '明', period: '公元1368年-公元1644年', symbol: '宝船', eventIds: ['event_zhenghe', 'event_jingnan', 'event_qijiguang', 'event_tumu', 'event_zhangjuzheng', 'event_yongle_qiandu', 'event_yongledadian', 'event_wanli', 'event_liimaodou', 'event_li_zicheng'] },
+    ],
+    eventCards: [
+      { id: 'event_chengjisi', name: '成吉思汗统一蒙古', description: '铁木真统一蒙古各部，建立大蒙古国', year: 1206, dynastyId: 'dynasty_yuan' },
+      { id: 'event_hubilie', name: '忽必烈建元', description: '忽必烈定国号为大元，定都大都', year: 1271, dynastyId: 'dynasty_yuan' },
+      { id: 'event_makeboluo', name: '马可波罗来华', description: '意大利旅行家马可波罗到达元朝', year: 1275, dynastyId: 'dynasty_yuan' },
+      { id: 'event_xingsheng', name: '行省制度', description: '元代设行中书省，开后世省级行政区之先', year: 1271, dynastyId: 'dynasty_yuan' },
+      { id: 'event_hongjin', name: '红巾军起义', description: '红巾军起义席卷南北，元朝统治瓦解', year: 1351, dynastyId: 'dynasty_yuan' },
+      { id: 'event_guanhanqing', name: '关汉卿元曲', description: '关汉卿作《窦娥冤》等杂剧，元曲冠绝一时', year: 1280, dynastyId: 'dynasty_yuan' },
+      { id: 'event_guoshoujing', name: '郭守敬《授时历》', description: '郭守敬制《授时历》，岁差精密，行用逾三百年', year: 1281, dynastyId: 'dynasty_yuan' },
+      { id: 'event_penghu', name: '澎湖巡检司', description: '元设澎湖巡检司，辖台湾澎湖，海疆建制之始', year: 1281, dynastyId: 'dynasty_yuan' },
+      { id: 'event_nanpo', name: '南坡之变', description: '元英宗在南坡之变中被弑，新政受挫', year: 1323, dynastyId: 'dynasty_yuan' },
+      { id: 'event_huangdaopo', name: '黄道婆纺织', description: '黄道婆自海南传棉纺织技术，江东棉业大兴', year: 1295, dynastyId: 'dynasty_yuan' },
+      { id: 'event_zhenghe', name: '郑和下西洋', description: '郑和七次率船队远航西洋各国', year: 1405, dynastyId: 'dynasty_ming' },
+      { id: 'event_jingnan', name: '靖难之役', description: '朱棣起兵夺取皇位，迁都北京', year: 1399, dynastyId: 'dynasty_ming' },
+      { id: 'event_qijiguang', name: '戚继光抗倭', description: '戚继光组建戚家军，平定东南倭患', year: 1555, dynastyId: 'dynasty_ming' },
+      { id: 'event_tumu', name: '土木堡之变', description: '明英宗亲征瓦剌兵败被俘于土木堡，明朝由盛转衰。', year: 1449, dynastyId: 'dynasty_ming', period: '公元1449年' },
+      { id: 'event_zhangjuzheng', name: '张居正改革', description: '明万历初年张居正推行一条鞭法等改革，挽明于一时。', year: 1573, dynastyId: 'dynasty_ming', period: '公元1573年-公元1582年' },
+      { id: 'event_yongle_qiandu', name: '永乐迁都', description: '明成祖迁都北京，营建紫禁城，天子守国门', year: 1421, dynastyId: 'dynasty_ming' },
+      { id: 'event_yongledadian', name: '修《永乐大典》', description: '明成祖敕修《永乐大典》，类书之冠', year: 1407, dynastyId: 'dynasty_ming' },
+      { id: 'event_wanli', name: '万历怠政', description: '万历中后期不朝日久，党争加剧，国势渐衰', year: 1582, dynastyId: 'dynasty_ming' },
+      { id: 'event_liimaodou', name: '利玛窦来华', description: '利玛窦抵京传教，西学东渐，著《坤舆万国全图》', year: 1601, dynastyId: 'dynasty_ming' },
+      { id: 'event_li_zicheng', name: '李自成起义', description: '李自成起兵陕北，号闯王，攻入北京灭明', year: 1630, dynastyId: 'dynasty_ming' },
+    ],
+  },
+  /* ============ 第 8 章 清及尾声 ============ */
+  {
+    id: 8,
+    name: '清及尾声',
+    dynastyCards: [
+      { id: 'dynasty_qing', name: '清', period: '公元1644年-公元1912年', symbol: '龙旗', eventIds: ['event_kangqian', 'event_yapian', 'event_taiping', 'event_yangwu', 'event_wuxu', 'event_xinhai', 'event_shunzhi', 'event_sanfan', 'event_yakesa', 'event_nibuchu', 'event_wenzi', 'event_tanding', 'event_heshen', 'event_humen', 'event_erying', 'event_yuanmingyuan', 'event_jiawu', 'event_yihetuan', 'event_xinzheng', 'event_xuantong'] },
+    ],
+    eventCards: [
+      { id: 'event_kangqian', name: '康乾盛世', description: '康熙至乾隆时期的鼎盛时代', year: 1661, dynastyId: 'dynasty_qing' },
+      { id: 'event_yapian', name: '鸦片战争', description: '英国发动侵华战争，中国开始沦为半殖民地', year: 1840, dynastyId: 'dynasty_qing' },
+      { id: 'event_taiping', name: '太平天国运动', description: '洪秀全领导的农民起义，席卷半个中国', year: 1851, dynastyId: 'dynasty_qing' },
+      { id: 'event_yangwu', name: '洋务运动', description: '清末洋务派兴办军工、学堂与轮船招商局，师夷长技以自强。', year: 1861, dynastyId: 'dynasty_qing', period: '公元1861年-公元1895年' },
+      { id: 'event_wuxu', name: '戊戌变法', description: '清末康有为梁启超推动百日维新，旋即失败。', year: 1898, dynastyId: 'dynasty_qing', period: '公元1898年' },
+      { id: 'event_xinhai', name: '辛亥革命', description: '1911年武昌起义推翻清朝帝制，建立中华民国。', year: 1911, dynastyId: 'dynasty_qing', period: '公元1911年' },
+      { id: 'event_shunzhi', name: '顺治入关', description: '清军入关定鼎北京，开始对全国的统治', year: 1644, dynastyId: 'dynasty_qing' },
+      { id: 'event_sanfan', name: '平定三藩', description: '康熙平定了吴三桂等三藩之乱，巩固统一', year: 1673, dynastyId: 'dynasty_qing' },
+      { id: 'event_yakesa', name: '雅克萨之战', description: '清军两次雅克萨自卫反击沙俄，捍卫黑龙江流域', year: 1685, dynastyId: 'dynasty_qing' },
+      { id: 'event_nibuchu', name: '《尼布楚条约》', description: '中俄签订《尼布楚条约》，划定东段边界', year: 1689, dynastyId: 'dynasty_qing' },
+      { id: 'event_wenzi', name: '文字狱', description: '清初屡兴文字狱，士人噤声，思想禁锢', year: 1663, dynastyId: 'dynasty_qing' },
+      { id: 'event_tanding', name: '摊丁入亩', description: '雍正摊丁入亩，废人头税，赋役合一', year: 1723, dynastyId: 'dynasty_qing' },
+      { id: 'event_heshen', name: '和珅专权', description: '乾隆晚年宠信和珅，贪腐横行，国库亏空', year: 1776, dynastyId: 'dynasty_qing' },
+      { id: 'event_humen', name: '虎门销烟', description: '林则徐虎门销烟，挫败鸦片走私，振奋人心', year: 1839, dynastyId: 'dynasty_qing' },
+      { id: 'event_erying', name: '第二次鸦片战争', description: '英法联军侵华，京津再遭劫难', year: 1856, dynastyId: 'dynasty_qing' },
+      { id: 'event_yuanmingyuan', name: '圆明园焚毁', description: '英法联军焚掠圆明园，万园之园化为废墟', year: 1860, dynastyId: 'dynasty_qing' },
+      { id: 'event_jiawu', name: '甲午战争', description: '甲午中日战争清军惨败，割台赔款', year: 1894, dynastyId: 'dynasty_qing' },
+      { id: 'event_yihetuan', name: '义和团', description: '义和团运动兴起，扶清灭洋，招致八国联军', year: 1899, dynastyId: 'dynasty_qing' },
+      { id: 'event_xinzheng', name: '清末新政', description: '清廷推行清末新政，编新军、兴学堂，为时已晚', year: 1901, dynastyId: 'dynasty_qing' },
+      { id: 'event_xuantong', name: '宣统退位', description: '宣统帝退位，清亡，两千年帝制终结', year: 1912, dynastyId: 'dynasty_qing' },
+    ],
+  },
+];
+
+/* ---------------------- 2. 朝代 tagline（原样移植 dynasty-images.ts） ---------------------- */
+const DYNASTY_TAGLINES = {
+  dynasty_shang: '天命玄鸟·青铜礼乐',
+  dynasty_zhou: '制礼作乐·宗周鼎盛',
+  dynasty_chunqiu: '礼崩乐坏·百家初鸣',
+  dynasty_zhanguo: '七雄逐鹿·变法图强',
+  dynasty_qin: '横扫六合·一统天下',
+  dynasty_xihan: '丝绸之路·汉武雄风',
+  dynasty_donghan: '光武中兴·儒学昌明',
+  dynasty_sanguo: '英雄辈出·鼎立天下',
+  dynasty_sui: '运河千里·科举开源',
+  dynasty_tang: '盛世华章·万国来朝',
+  dynasty_wudai: '乱世风云·词帝哀歌',
+  dynasty_song: '文治天下·风雅千年',
+  dynasty_yuan: '铁骑纵横·疆域无垠',
+  dynasty_ming: '七下西洋·刚劲华美',
+  dynasty_qing: '康乾盛世·落日余晖',
+};
+
+/* 朝代 id -> 名称（用于卡片 chip 显示「唐·事件」等） */
+const DYNASTY_NAMES = {};
+MOCK_LEVELS.forEach((lvl) => lvl.dynastyCards.forEach((d) => { DYNASTY_NAMES[d.id] = d.name; }));
+
+/* 朝代 emoji（替代私有插画 URL） */
+const DYNASTY_EMOJI = {
+  dynasty_shang: '🐉',
+  dynasty_zhou: '🛡️',
+  dynasty_chunqiu: '🏺',
+  dynasty_zhanguo: '📜',
+  dynasty_qin: '🧱',
+  dynasty_xihan: '🏯',
+  dynasty_donghan: '🐎',
+  dynasty_sanguo: '🪶',
+  dynasty_sui: '⛵',
+  dynasty_tang: '🌸',
+  dynasty_wudai: '🐯',
+  dynasty_song: '🍶',
+  dynasty_yuan: '⛺',
+  dynasty_ming: '🚢',
+  dynasty_qing: '🐉',
+};
+
+/* 事件 emoji（替代私有插画 URL） */
+const EVENT_EMOJI = {
+  event_kongzi: '🧙', event_qihuangong: '👑', event_chengpu: '⚔️',
+  event_shangyang: '📜', event_changping: '⚔️', event_baijia: '💬',
+  event_tongyi: '🏯', event_fenshu: '🔥', event_changcheng: '🧱',
+  event_wenjing: '🌾', event_zhangqian: '🐫', event_qiguo: '⚔️',
+  event_guangwu: '👑', event_banchao: '🖋️', event_huangjin: '🟡',
+  event_chibi: '🔥', event_guandu: '⚔️', event_sangu: '🏠',
+  event_dayunhe: '🌊', event_keju: '📝', event_tongyi_nanbei: '🤝',
+  event_zhenguan: '👑', event_anshi: '🔥', event_xuanzang: '🧎',
+  event_chenqiao: '🛡️', event_liyu: '📜', event_shijingtang: '📜',
+  event_beijiu: '🍶', event_jingkang: '😞', event_yuefei: '⚔️',
+  event_chengjisi: '🐎', event_hubilie: '🏛️', event_makeboluo: '🧭',
+  event_zhenghe: '⛵', event_jingnan: '🛡️', event_qijiguang: '⚔️',
+  event_kangqian: '👑', event_yapian: '💨', event_taiping: '🌾',
+};
+
+/* 人物 emoji（替代私有插画 URL） */
+const PERSON_EMOJI = {
+  person_kongzi: '🧙', person_shangyang: '📜', person_yingzheng: '👑',
+  person_zhangqian: '🐫', person_li_shimin: '👑', person_xuanzang: '🧎',
+  person_zhaokuangyin: '🛡️', person_yuefei: '⚔️', person_chengjisi: '🐎',
+  person_hubilie: '🏛️', person_zhenghe: '⛵', person_qijiguang: '⚔️',
+  person_suiyangdi: '⛵', person_zhugeliang: '🪶', person_caocao: '🗡️',
+  person_banchao: '🖋️', person_zhaokuangyin_beijiu: '🍶', person_kangxi: '👑',
+  person_sima_qian: '📜', person_cai_lun: '📜', person_wuzetian: '👑',
+  person_libai: '🍶', person_wanganshi: '📜', person_shenkuo: '📖',
+  person_zhangjuzheng: '📜', person_sunzhongshan: '🇨🇳',
+};
+
+/* 根据 id + 类型返回兜底 emoji（图加载失败时显示） */
+function cardEmoji(id, kind) {
+  if (kind === 'dynasty') return DYNASTY_EMOJI[id] || '🏛️';
+  if (kind === 'event') return EVENT_EMOJI[id] || '📜';
+  return PERSON_EMOJI[id] || '👤';
+}
+
+/* ---------------------- 2.5 内联 SVG 古风插画资源字典（纯字符串，按 id 索引，零依赖） ---------------------- */
+/* 全部为内联矢量，无外部图片 / 字体 / CDN；色板复用国风变量。 */
+const CARD_ART = {
+  dynasty: {
+    dynasty_chunqiu: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><rect x="14" y="54" width="72" height="6" rx="2" fill="#7A6B52"/><rect x="16" y="22" width="68" height="4" rx="2" fill="#4A3F2E"/><g fill="#DAA520" stroke="#8B7355" stroke-width="1"><path d="M26 25 q-7 1 -7 13 q0 6 7 6 q7 0 7 -6 q0 -12 -7 -13z"/><path d="M50 23 q-9 1 -9 17 q0 7 9 7 q9 0 9 -7 q0 -16 -9 -17z"/><path d="M74 25 q-7 1 -7 13 q0 6 7 6 q7 0 7 -6 q0 -12 -7 -13z"/></g><g stroke="#4A3F2E" stroke-width="1"><line x1="26" y1="22" x2="26" y2="25"/><line x1="50" y1="22" x2="50" y2="23"/><line x1="74" y1="22" x2="74" y2="25"/></g><circle cx="40" cy="50" r="3.2" fill="#2C2416"/><path d="M35 54 q5 -7 10 0z" fill="#2C2416"/></svg>',
+    dynasty_zhanguo: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="52" width="100" height="23" fill="#E7D9C0"/><rect x="10" y="40" width="80" height="14" fill="#7A6B52"/><g fill="#4A3F2E"><rect x="12" y="36" width="6" height="6"/><rect x="24" y="36" width="6" height="6"/><rect x="36" y="36" width="6" height="6"/><rect x="48" y="36" width="6" height="6"/><rect x="60" y="36" width="6" height="6"/><rect x="72" y="36" width="6" height="6"/><rect x="84" y="36" width="6" height="6"/></g><g stroke="#C41E3A" stroke-width="2.5" stroke-linecap="round"><line x1="34" y1="14" x2="64" y2="44"/><line x1="66" y1="14" x2="36" y2="44"/></g><circle cx="34" cy="14" r="3" fill="#DAA520"/><circle cx="66" cy="14" r="3" fill="#DAA520"/></svg>',
+    dynasty_qin: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><path d="M0 58 Q30 44 60 52 T100 48 L100 58 Z" fill="#B7A98C"/><path d="M0 58 Q30 44 60 52 T100 48" fill="none" stroke="#8B7355" stroke-width="1.5"/><g fill="#C9B89A" stroke="#8B7355" stroke-width="1"><circle cx="20" cy="50" r="3.5"/><rect x="16" y="53" width="8" height="9" rx="2"/><circle cx="40" cy="50" r="3.5"/><rect x="36" y="53" width="8" height="9" rx="2"/><circle cx="60" cy="50" r="3.5"/><rect x="56" y="53" width="8" height="9" rx="2"/></g><rect x="78" y="30" width="6" height="28" fill="#7A6B52"/><rect x="70" y="34" width="22" height="4" fill="#4A3F2E"/></svg>',
+    dynasty_xihan: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><circle cx="80" cy="20" r="8" fill="#DAA520"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><path d="M22 56 q-4 -14 6 -18 q2 -8 8 -4 q4 -8 9 -2 q6 -4 8 4 q8 4 4 20z" fill="#A9855E"/><rect x="30" y="40" width="20" height="16" rx="3" fill="#A9855E"/><line x1="34" y1="56" x2="34" y2="64" stroke="#4A3F2E" stroke-width="2"/><line x1="46" y1="56" x2="46" y2="64" stroke="#4A3F2E" stroke-width="2"/><rect x="64" y="28" width="14" height="10" rx="1" fill="#E7D9C0" stroke="#8B7355"/><line x1="71" y1="28" x2="71" y2="38" stroke="#8B7355"/><line x1="78" y1="28" x2="78" y2="38" stroke="#8B7355"/></svg>',
+    dynasty_donghan: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><rect x="12" y="30" width="34" height="26" rx="2" fill="#FBF7EC" stroke="#C9B89A" stroke-width="1"/><line x1="20" y1="38" x2="38" y2="38" stroke="#C9B89A"/><line x1="20" y1="44" x2="38" y2="44" stroke="#C9B89A"/><line x1="20" y1="50" x2="34" y2="50" stroke="#C9B89A"/><g transform="translate(70,42)" fill="none" stroke="#2E4A6B" stroke-width="2"><circle r="16"/><ellipse rx="16" ry="6"/><ellipse rx="6" ry="16"/><line x1="-16" y1="0" x2="16" y2="0"/><line x1="0" y1="-16" x2="0" y2="16"/></g><circle cx="70" cy="42" r="3" fill="#DAA520"/></svg>',
+    dynasty_sanguo: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="56" width="100" height="19" fill="#CFE0E6"/><path d="M0 60 q12 -8 25 0 t25 0 t25 0 t25 0 v15 H0 Z" fill="#9FC2CF"/><g transform="translate(52,30)"><path d="M0 0 L-16 -18 A22 22 0 0 1 16 -18 Z" fill="#DAA520" stroke="#8B7355" stroke-width="1"/><line x1="0" y1="0" x2="0" y2="26" stroke="#4A3F2E" stroke-width="2.5"/></g></svg>',
+    dynasty_sui: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="50" width="100" height="25" fill="#CFE0E6"/><path d="M0 50 q25 -4 50 0 t50 0 v6 H0 Z" fill="#9FC2CF"/><path d="M20 52 Q50 18 80 52" fill="none" stroke="#7A6B52" stroke-width="5"/><path d="M30 52 Q50 30 70 52" fill="none" stroke="#4A3F2E" stroke-width="2"/><rect x="44" y="22" width="12" height="6" fill="#4A3F2E"/><line x1="50" y1="50" x2="50" y2="56" stroke="#8B7355" stroke-width="1.5"/></svg>',
+    dynasty_tang: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><rect x="14" y="34" width="40" height="24" fill="#C0392B"/><path d="M10 34 Q34 22 58 34 Z" fill="#2E4A6B"/><rect x="28" y="42" width="12" height="16" fill="#F5EFE0"/><g fill="#DAA520"><rect x="60" y="40" width="14" height="18" rx="2"/><path d="M60 40 q7 -8 14 0z" fill="#E08A2B"/></g><circle cx="67" cy="49" r="3" fill="#F5EFE0"/><path d="M78 56 q4 -10 8 0 q-4 6 -8 0z" fill="#C41E3A"/><line x1="82" y1="46" x2="82" y2="56" stroke="#4A3F2E" stroke-width="1.5"/></svg>',
+    dynasty_wudai: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="54" width="100" height="21" fill="#E7D9C0"/><rect x="16" y="38" width="30" height="16" fill="#7A6B52"/><g fill="#4A3F2E"><rect x="18" y="34" width="5" height="5"/><rect x="26" y="34" width="5" height="5"/><rect x="34" y="34" width="5" height="5"/><rect x="42" y="34" width="5" height="5"/></g><rect x="54" y="44" width="30" height="10" fill="#8B7355"/><g fill="#9A9A9A"><path d="M28 34 q-4 -10 2 -16 q-3 8 2 16z" opacity="0.8"/><path d="M68 44 q-4 -10 2 -16 q-3 8 2 16z" opacity="0.8"/></g></svg>',
+    dynasty_song: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="52" width="100" height="23" fill="#CFE0E6"/><path d="M0 56 q20 -4 40 0 t40 0 t20 0 v6 H0 Z" fill="#9FC2CF"/><path d="M14 54 Q50 24 86 54" fill="none" stroke="#7A6B52" stroke-width="5"/><g stroke="#4A3F2E" stroke-width="1.5"><line x1="30" y1="40" x2="30" y2="54"/><line x1="50" y1="34" x2="50" y2="54"/><line x1="70" y1="40" x2="70" y2="54"/></g><path d="M76 40 q10 0 10 10 q0 8 -10 8 q-10 0 -10 -8 q0 -10 10 -10z" fill="#8FBFA0" stroke="#4A6B55" stroke-width="1.5"/><rect x="73" y="34" width="6" height="6" fill="#4A6B55"/></svg>',
+    dynasty_yuan: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="58" width="100" height="17" fill="#DfE3C8"/><path d="M18 58 q22 -34 44 0 z" fill="#FBF7EC" stroke="#8B7355" stroke-width="1.5"/><line x1="40" y1="40" x2="40" y2="58" stroke="#8B7355"/><path d="M64 58 q-2 -12 8 -14 q10 -2 12 8 l4 6 -4 0 -4 -6 q-6 2 -10 6z" fill="#7A6B52"/><line x1="70" y1="58" x2="70" y2="64" stroke="#4A3F2E" stroke-width="2"/><line x1="80" y1="58" x2="80" y2="64" stroke="#4A3F2E" stroke-width="2"/></svg>',
+    dynasty_ming: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="56" width="100" height="19" fill="#CFE0E6"/><path d="M0 60 q20 -4 40 0 t40 0 t20 0 v6 H0 Z" fill="#9FC2CF"/><path d="M22 56 L78 56 L70 46 L30 46 Z" fill="#7A4A2E"/><rect x="30" y="30" width="3" height="18" fill="#4A3F2E"/><rect x="50" y="24" width="3" height="24" fill="#4A3F2E"/><rect x="67" y="30" width="3" height="18" fill="#4A3F2E"/><path d="M33 32 L48 32 L48 44 L33 44 Z" fill="#FBF7EC" stroke="#C41E3A"/><path d="M53 26 L65 26 L65 44 L53 44 Z" fill="#FBF7EC" stroke="#C41E3A"/></svg>',
+    dynasty_qing: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><rect x="16" y="36" width="68" height="22" fill="#C0392B"/><path d="M10 36 Q50 22 90 36 Z" fill="#2E4A6B"/><rect x="44" y="46" width="12" height="12" fill="#F5EFE0"/><g fill="#DAA520"><rect x="14" y="40" width="4" height="14"/><rect x="82" y="40" width="4" height="14"/></g><line x1="50" y1="22" x2="50" y2="14" stroke="#C41E3A" stroke-width="2"/><circle cx="50" cy="13" r="2.5" fill="#DAA520"/></svg>',
+  },
+  person: {
+    person_kongzi: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><circle cx="44" cy="24" r="8" fill="#E8C9A0" stroke="#4A3F2E" stroke-width="1"/><path d="M36 18 q8 -6 16 0z" fill="#2E4A6B"/><path d="M34 32 q10 -6 20 0 l6 28 H28 Z" fill="#2E4A6B" stroke="#1f3550" stroke-width="1"/><rect x="58" y="30" width="20" height="14" rx="2" fill="#FBF7EC" stroke="#8B7355"/><line x1="68" y1="30" x2="68" y2="44" stroke="#8B7355"/><line x1="58" y1="37" x2="78" y2="37" stroke="#8B7355"/></svg>',
+    person_shangyang: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><circle cx="44" cy="24" r="8" fill="#E8C9A0" stroke="#4A3F2E" stroke-width="1"/><path d="M36 18 q8 -6 16 0z" fill="#4A3F2E"/><path d="M34 32 q10 -6 20 0 l6 28 H28 Z" fill="#7A6B52" stroke="#4A3F2E"/><rect x="60" y="34" width="14" height="20" rx="1" fill="#C9A86A" stroke="#8B7355"/><line x1="67" y1="34" x2="67" y2="54" stroke="#8B7355"/><line x1="60" y1="42" x2="74" y2="42" stroke="#8B7355"/><line x1="60" y1="48" x2="74" y2="48" stroke="#8B7355"/></svg>',
+    person_yingzheng: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><circle cx="50" cy="26" r="8" fill="#E8C9A0" stroke="#4A3F2E" stroke-width="1"/><rect x="34" y="14" width="32" height="7" rx="1" fill="#2C2416"/><line x1="40" y1="21" x2="40" y2="28" stroke="#DAA520" stroke-width="1.5"/><line x1="50" y1="21" x2="50" y2="28" stroke="#DAA520" stroke-width="1.5"/><line x1="60" y1="21" x2="60" y2="28" stroke="#DAA520" stroke-width="1.5"/><path d="M36 34 q14 -6 28 0 l6 26 H30 Z" fill="#C41E3A" stroke="#8B2018"/><g fill="#DAA520"><circle cx="44" cy="44" r="2"/><circle cx="56" cy="44" r="2"/></g></svg>',
+    person_zhangqian: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><circle cx="44" cy="24" r="8" fill="#E8C9A0" stroke="#4A3F2E" stroke-width="1"/><path d="M36 18 q8 -6 16 0z" fill="#4A3F2E"/><path d="M34 32 q10 -6 20 0 l6 28 H28 Z" fill="#7A6B52"/><line x1="66" y1="14" x2="66" y2="58" stroke="#4A3F2E" stroke-width="2.5"/><g fill="#C41E3A"><path d="M63 16 l3 8 l3 -8z"/><path d="M63 30 l3 8 l3 -8z"/></g></svg>',
+    person_li_shimin: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><circle cx="50" cy="24" r="8" fill="#E8C9A0" stroke="#4A3F2E" stroke-width="1"/><path d="M40 18 q10 -8 20 0z" fill="#C41E3A"/><path d="M36 34 q14 -6 28 0 l6 26 H30 Z" fill="#C41E3A" stroke="#8B2018"/><g fill="#DAA520"><rect x="42" y="40" width="16" height="3"/><rect x="42" y="48" width="16" height="3"/></g><circle cx="50" cy="30" r="3" fill="#DAA520"/></svg>',
+    person_xuanzang: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><circle cx="46" cy="24" r="8" fill="#E8C9A0" stroke="#4A3F2E" stroke-width="1"/><path d="M38 20 q8 -8 16 0z" fill="#E0A93B"/><path d="M34 32 q12 -6 24 0 l8 28 H26 Z" fill="#E0A93B" stroke="#B8860B"/><rect x="60" y="34" width="12" height="14" rx="3" fill="#7A6B52" stroke="#4A3F2E"/><line x1="66" y1="34" x2="66" y2="30" stroke="#4A3F2E" stroke-width="1.5"/></svg>',
+    person_zhaokuangyin: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><circle cx="50" cy="24" r="8" fill="#E8C9A0" stroke="#4A3F2E" stroke-width="1"/><path d="M40 18 q10 -8 20 0z" fill="#4A3F2E"/><path d="M36 34 q14 -6 28 0 l6 26 H30 Z" fill="#E8C44A" stroke="#B8860B"/><g fill="#C41E3A"><circle cx="50" cy="44" r="2.5"/><circle cx="44" cy="50" r="2"/><circle cx="56" cy="50" r="2"/></g></svg>',
+    person_yuefei: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><circle cx="50" cy="24" r="8" fill="#E8C9A0" stroke="#4A3F2E" stroke-width="1"/><path d="M40 18 q10 -7 20 0z" fill="#7A6B52"/><path d="M36 34 q14 -6 28 0 l6 26 H30 Z" fill="#8B9BA8" stroke="#4A3F2E"/><g stroke="#4A3F2E" stroke-width="1"><line x1="42" y1="38" x2="58" y2="38"/><line x1="42" y1="46" x2="58" y2="46"/><line x1="50" y1="34" x2="50" y2="56"/></g><rect x="62" y="36" width="4" height="20" fill="#C41E3A"/></svg>',
+    person_chengjisi: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><circle cx="50" cy="24" r="8" fill="#E8C9A0" stroke="#4A3F2E" stroke-width="1"/><path d="M38 18 q12 -4 24 0 q-2 6 -12 6 q-10 0 -12 -6z" fill="#9A7B4F"/><path d="M34 34 q16 -6 32 0 l8 26 H26 Z" fill="#9A7B4F" stroke="#6B5230"/><g fill="#6B5230"><circle cx="44" cy="44" r="2"/><circle cx="56" cy="44" r="2"/></g></svg>',
+    person_hubilie: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><circle cx="50" cy="24" r="8" fill="#E8C9A0" stroke="#4A3F2E" stroke-width="1"/><path d="M40 18 q10 -6 20 0z" fill="#2E4A6B"/><path d="M34 34 q16 -6 32 0 l8 26 H26 Z" fill="#2E4A6B" stroke="#1f3550"/><rect x="44" y="40" width="12" height="6" fill="#C41E3A"/></svg>',
+    person_zhenghe: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><circle cx="50" cy="24" r="8" fill="#E8C9A0" stroke="#4A3F2E" stroke-width="1"/><path d="M40 18 q10 -8 20 0z" fill="#4A3F2E"/><path d="M34 34 q16 -6 32 0 l8 26 H26 Z" fill="#4A3F2E" stroke="#2C2416"/><g fill="#DAA520"><rect x="44" y="42" width="12" height="3"/><rect x="44" y="50" width="12" height="3"/></g><circle cx="50" cy="30" r="2.5" fill="#DAA520"/></svg>',
+    person_qijiguang: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><circle cx="50" cy="24" r="8" fill="#E8C9A0" stroke="#4A3F2E" stroke-width="1"/><path d="M40 18 q10 -7 20 0z" fill="#7A6B52"/><path d="M36 34 q14 -6 28 0 l6 26 H30 Z" fill="#8B9BA8" stroke="#4A3F2E"/><g stroke="#4A3F2E" stroke-width="1"><line x1="43" y1="38" x2="57" y2="38"/><line x1="43" y1="46" x2="57" y2="46"/><line x1="50" y1="34" x2="50" y2="56"/></g><rect x="62" y="34" width="4" height="22" fill="#C41E3A"/></svg>',
+    person_suiyangdi: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><circle cx="50" cy="24" r="8" fill="#E8C9A0" stroke="#4A3F2E" stroke-width="1"/><path d="M40 18 q10 -8 20 0z" fill="#2E4A6B"/><path d="M36 34 q14 -6 28 0 l6 26 H30 Z" fill="#C41E3A" stroke="#8B2018"/><g fill="#DAA520"><circle cx="50" cy="44" r="2.5"/><circle cx="44" cy="50" r="1.8"/><circle cx="56" cy="50" r="1.8"/></g></svg>',
+    person_zhugeliang: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><circle cx="46" cy="24" r="8" fill="#E8C9A0" stroke="#4A3F2E" stroke-width="1"/><rect x="36" y="18" width="20" height="5" rx="2" fill="#2E4A6B"/><path d="M32 34 q14 -6 28 0 l5 26 H27 Z" fill="#2E4A6B"/><g transform="translate(70,40)"><path d="M0 0 L-12 -14 A18 18 0 0 1 12 -14 Z" fill="#DAA520" stroke="#8B7355"/><line x1="0" y1="0" x2="0" y2="16" stroke="#4A3F2E" stroke-width="2"/></g></svg>',
+    person_caocao: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><circle cx="50" cy="24" r="8" fill="#E8C9A0" stroke="#4A3F2E" stroke-width="1"/><path d="M40 18 q10 -8 20 0z" fill="#2E4A6B"/><path d="M34 34 q16 -6 32 0 l8 26 H26 Z" fill="#2E4A6B" stroke="#1f3550"/><rect x="62" y="40" width="4" height="20" fill="#4A3F2E"/><path d="M62 40 l4 0 l-2 -6z" fill="#4A3F2E"/></svg>',
+    person_banchao: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><circle cx="44" cy="24" r="8" fill="#E8C9A0" stroke="#4A3F2E" stroke-width="1"/><path d="M36 18 q8 -6 16 0z" fill="#4A3F2E"/><path d="M34 32 q10 -6 20 0 l6 28 H28 Z" fill="#7A6B52"/><line x1="66" y1="14" x2="66" y2="58" stroke="#4A3F2E" stroke-width="2.5"/><g fill="#C41E3A"><path d="M63 16 l3 8 l3 -8z"/><path d="M63 30 l3 8 l3 -8z"/></g><rect x="58" y="40" width="4" height="20" fill="#4A3F2E"/></svg>',
+    person_zhaokuangyin_beijiu: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><circle cx="50" cy="24" r="8" fill="#E8C9A0" stroke="#4A3F2E" stroke-width="1"/><path d="M40 18 q10 -8 20 0z" fill="#4A3F2E"/><path d="M36 34 q14 -6 28 0 l6 26 H30 Z" fill="#E8C44A" stroke="#B8860B"/><path d="M64 44 q4 -6 8 0 q0 4 -4 4 q-4 0 -4 -4z" fill="#DAA520"/><path d="M66 40 q2 -4 4 0" fill="none" stroke="#9A8A6A" stroke-width="1"/></svg>',
+    person_kangxi: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><circle cx="50" cy="24" r="8" fill="#E8C9A0" stroke="#4A3F2E" stroke-width="1"/><path d="M40 18 q10 -6 20 0z" fill="#2E4A6B"/><path d="M36 34 q14 -6 28 0 l6 26 H30 Z" fill="#2E4A6B" stroke="#1f3550"/><g fill="#DAA520"><circle cx="44" cy="44" r="2"/><circle cx="56" cy="44" r="2"/><circle cx="50" cy="50" r="2"/><line x1="44" y1="40" x2="56" y2="40" stroke="#DAA520" stroke-width="1.5"/></g></svg>',
+  },
+  event: {
+    event_kongzi: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><circle cx="34" cy="58" r="8" fill="none" stroke="#4A3F2E" stroke-width="3"/><circle cx="58" cy="58" r="8" fill="none" stroke="#4A3F2E" stroke-width="3"/><rect x="28" y="42" width="36" height="12" rx="2" fill="#7A6B52"/><path d="M40 42 l-6 -10 l10 0z" fill="#C41E3A"/><circle cx="70" cy="30" r="6" fill="#E8C9A0" stroke="#4A3F2E"/><path d="M64 38 q6 -6 12 0 l2 8 h-16z" fill="#2E4A6B"/></svg>',
+    event_qihuangong: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><circle cx="42" cy="26" r="8" fill="#E8C9A0" stroke="#4A3F2E"/><path d="M34 20 q8 -8 16 0z" fill="#DAA520"/><path d="M32 34 q10 -5 20 0 l5 26 H27 Z" fill="#C41E3A" stroke="#8B2018"/><line x1="72" y1="14" x2="72" y2="58" stroke="#4A3F2E" stroke-width="2.5"/><path d="M72 16 L90 22 L72 28 Z" fill="#C41E3A"/></svg>',
+    event_chengpu: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="50" width="100" height="25" fill="#E7D9C0"/><rect x="0" y="40" width="100" height="12" fill="#7A6B52"/><g fill="#4A3F2E"><rect x="6" y="36" width="8" height="5"/><rect x="22" y="36" width="8" height="5"/><rect x="38" y="36" width="8" height="5"/><rect x="54" y="36" width="8" height="5"/><rect x="70" y="36" width="8" height="5"/><rect x="86" y="36" width="8" height="5"/></g><g stroke="#C41E3A" stroke-width="2.5" stroke-linecap="round"><line x1="42" y1="14" x2="62" y2="38"/><line x1="62" y1="14" x2="42" y2="38"/></g></svg>',
+    event_shangyang: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><rect x="20" y="30" width="10" height="28" fill="#7A6B52"/><rect x="70" y="30" width="10" height="28" fill="#7A6B52"/><rect x="18" y="24" width="64" height="8" fill="#4A3F2E"/><rect x="46" y="14" width="8" height="44" fill="#A9855E" stroke="#6B5230" stroke-width="1"/><line x1="50" y1="14" x2="42" y2="24" stroke="#8B7355"/><line x1="50" y1="14" x2="58" y2="24" stroke="#8B7355"/></svg>',
+    event_changping: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="54" width="100" height="21" fill="#DfCFB0"/><rect x="30" y="60" width="40" height="8" fill="#8B7355"/><g stroke="#4A3F2E" stroke-width="2"><line x1="16" y1="20" x2="16" y2="54"/><line x1="30" y1="16" x2="30" y2="54"/><line x1="44" y1="20" x2="44" y2="54"/><line x1="58" y1="16" x2="58" y2="54"/><line x1="72" y1="20" x2="72" y2="54"/><line x1="86" y1="16" x2="86" y2="54"/></g><g fill="#DAA520"><circle cx="16" cy="19" r="2"/><circle cx="30" cy="15" r="2"/><circle cx="44" cy="19" r="2"/><circle cx="58" cy="15" r="2"/><circle cx="72" cy="19" r="2"/><circle cx="86" cy="15" r="2"/></g></svg>',
+    event_baijia: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><g fill="#2C2416"><circle cx="24" cy="40" r="6"/><circle cx="50" cy="38" r="6"/><circle cx="76" cy="40" r="6"/></g><g fill="#FBF7EC" stroke="#8B7355" stroke-width="1"><rect x="14" y="20" width="20" height="12" rx="3"/><rect x="40" y="16" width="22" height="13" rx="3"/><rect x="66" y="20" width="20" height="12" rx="3"/></g><g stroke="#8B7355" stroke-width="1"><line x1="22" y1="32" x2="26" y2="36"/><line x1="49" y1="29" x2="51" y2="35"/><line x1="74" y1="32" x2="78" y2="36"/></g></svg>',
+    event_tongyi: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><g fill="#C9B89A" stroke="#7A6B52" stroke-width="1"><circle cx="30" cy="26" r="7"/><circle cx="50" cy="20" r="7"/><circle cx="70" cy="26" r="7"/><circle cx="34" cy="46" r="7"/><circle cx="66" cy="46" r="7"/></g><circle cx="50" cy="40" r="14" fill="#DAA520" stroke="#B8860B" stroke-width="2"/><circle cx="50" cy="40" r="6" fill="#C41E3A"/></svg>',
+    event_fenshu: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="56" width="100" height="19" fill="#E7D9C0"/><g fill="#C9A86A" stroke="#8B7355" stroke-width="1"><rect x="34" y="46" width="32" height="6"/><rect x="36" y="40" width="28" height="6"/><rect x="38" y="34" width="24" height="6"/></g><g fill="#E08A2B"><path d="M50 34 q-8 -10 0 -18 q8 8 0 18z"/><path d="M50 34 q8 -6 4 -16 q4 10 -4 16z" fill="#C41E3A"/></g></svg>',
+    event_changcheng: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><path d="M0 60 L20 44 L40 58 L60 42 L80 56 L100 46 L100 75 L0 75 Z" fill="#D8C9A8"/><path d="M0 52 Q25 40 50 50 T100 46" fill="none" stroke="#7A6B52" stroke-width="5"/><path d="M0 52 Q25 40 50 50 T100 46" fill="none" stroke="#9A8A6A" stroke-width="2"/><rect x="60" y="38" width="12" height="14" fill="#7A6B52"/><g fill="#4A3F2E"><rect x="62" y="34" width="3" height="5"/><rect x="67" y="34" width="3" height="5"/><rect x="72" y="34" width="3" height="5"/></g></svg>',
+    event_wenjing: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><circle cx="78" cy="20" r="9" fill="#DAA520"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><g stroke="#A9855E" stroke-width="2"><line x1="30" y1="58" x2="30" y2="34"/><line x1="44" y1="58" x2="44" y2="30"/><line x1="58" y1="58" x2="58" y2="34"/></g><g fill="#C9A86A"><ellipse cx="30" cy="32" rx="3" ry="5"/><ellipse cx="44" cy="28" rx="3" ry="5"/><ellipse cx="58" cy="32" rx="3" ry="5"/></g></svg>',
+    event_zhangqian: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><path d="M20 56 q-4 -12 6 -16 q2 -7 7 -3 q4 -7 8 -2 q5 -3 7 3 q7 4 3 18z" fill="#A9855E"/><rect x="28" y="40" width="18" height="16" rx="3" fill="#A9855E"/><line x1="76" y1="14" x2="76" y2="58" stroke="#4A3F2E" stroke-width="2.5"/><g fill="#C41E3A"><path d="M73 16 l3 8 l3 -8z"/><path d="M73 30 l3 8 l3 -8z"/></g></svg>',
+    event_qiguo: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><g stroke="#4A3F2E" stroke-width="1.5"><line x1="12" y1="22" x2="12" y2="50"/><line x1="25" y1="22" x2="25" y2="50"/><line x1="38" y1="22" x2="38" y2="50"/><line x1="51" y1="22" x2="51" y2="50"/><line x1="64" y1="22" x2="64" y2="50"/><line x1="77" y1="22" x2="77" y2="50"/><line x1="90" y1="22" x2="90" y2="50"/></g><g fill="#C41E3A"><rect x="12" y="24" width="8" height="6"/><rect x="25" y="24" width="8" height="6"/><rect x="38" y="24" width="8" height="6"/><rect x="51" y="24" width="8" height="6"/><rect x="64" y="24" width="8" height="6"/><rect x="77" y="24" width="8" height="6"/><rect x="90" y="24" width="8" height="6"/></g></svg>',
+    event_guangwu: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><circle cx="50" cy="46" r="22" fill="#F3D98A" opacity="0.6"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><circle cx="50" cy="28" r="8" fill="#E8C9A0" stroke="#4A3F2E"/><path d="M42 22 q8 -8 16 0z" fill="#DAA520"/><path d="M40 36 q10 -5 20 0 l5 22 H35 Z" fill="#C41E3A" stroke="#8B2018"/></svg>',
+    event_banchao: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><line x1="34" y1="20" x2="34" y2="50" stroke="#4A3F2E" stroke-width="2" stroke-linecap="round"/><rect x="31" y="14" width="6" height="8" fill="#2C2416"/><rect x="30" y="20" width="8" height="30" fill="#C9A86A"/><line x1="64" y1="18" x2="64" y2="56" stroke="#7A6B52" stroke-width="3"/><path d="M64 18 l4 0 l-2 -6z" fill="#DAA520"/></svg>',
+    event_huangjin: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><circle cx="44" cy="26" r="8" fill="#E8C9A0" stroke="#4A3F2E"/><path d="M34 24 q10 -12 20 0 q-2 6 -10 6 q-8 0 -10 -6z" fill="#DAA520"/><path d="M34 34 q10 -5 20 0 l5 24 H29 Z" fill="#7A6B52"/><line x1="70" y1="14" x2="70" y2="58" stroke="#4A3F2E" stroke-width="2.5"/><path d="M70 16 L90 22 L70 28 Z" fill="#C41E3A"/></svg>',
+    event_chibi: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="50" width="100" height="25" fill="#9FC2CF"/><path d="M0 54 q25 -6 50 0 t50 0 v6 H0 Z" fill="#7FA9B8"/><path d="M30 50 L72 50 L64 60 L38 60 Z" fill="#7A4A2E"/><g fill="#E08A2B"><path d="M42 40 q-6 -10 0 -16 q6 6 0 16z"/><path d="M54 38 q6 -8 2 -16 q4 10 -2 16z" fill="#C41E3A"/></g><line x1="48" y1="40" x2="48" y2="50" stroke="#4A3F2E" stroke-width="2"/></svg>',
+    event_guandu: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><g stroke="#4A3F2E" stroke-width="2"><line x1="24" y1="30" x2="24" y2="56"/><line x1="34" y1="34" x2="34" y2="56"/><line x1="76" y1="30" x2="76" y2="56"/><line x1="66" y1="34" x2="66" y2="56"/></g><g fill="#C41E3A"><rect x="24" y="30" width="12" height="8"/><rect x="76" y="30" width="12" height="8"/></g><g fill="#2E4A6B"><rect x="34" y="34" width="10" height="7"/><rect x="66" y="34" width="10" height="7"/></g></svg>',
+    event_sangu: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="56" width="100" height="19" fill="#E7D9C0"/><path d="M30 40 L50 26 L70 40 Z" fill="#A9855E"/><rect x="38" y="40" width="24" height="16" fill="#C9A86A" stroke="#8B7355"/><rect x="46" y="46" width="8" height="10" fill="#7A6B52"/><circle cx="76" cy="44" r="6" fill="#E8C9A0" stroke="#4A3F2E"/><path d="M71 50 q5 -5 10 0 l2 6 h-14z" fill="#2E4A6B"/><line x1="70" y1="44" x2="62" y2="44" stroke="#4A3F2E" stroke-width="2"/></svg>',
+    event_dayunhe: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="46" width="100" height="29" fill="#CFE0E6"/><path d="M0 46 q25 -4 50 0 t50 0 v4 H0 Z" fill="#9FC2CF"/><path d="M34 50 L66 50 L58 60 L42 60 Z" fill="#7A4A2E"/><rect x="49" y="34" width="2" height="16" fill="#4A3F2E"/><path d="M51 36 L62 36 L62 48 L51 48 Z" fill="#FBF7EC" stroke="#C41E3A"/></svg>',
+    event_keju: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><rect x="20" y="22" width="40" height="34" rx="2" fill="#FBF7EC" stroke="#C9B89A" stroke-width="1.5"/><g stroke="#C9B89A" stroke-width="1"><line x1="28" y1="30" x2="52" y2="30"/><line x1="28" y1="36" x2="52" y2="36"/><line x1="28" y1="42" x2="48" y2="42"/><line x1="28" y1="48" x2="52" y2="48"/></g><line x1="70" y1="18" x2="70" y2="50" stroke="#4A3F2E" stroke-width="2"/><rect x="67" y="12" width="6" height="8" fill="#2C2416"/><rect x="66" y="18" width="8" height="32" fill="#C9A86A"/></svg>',
+    event_tongyi_nanbei: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="60" width="100" height="15" fill="#E7D9C0"/><path d="M30 14 L50 30 L70 14 Z" fill="#2E4A6B"/><path d="M30 54 L50 38 L70 54 Z" fill="#C41E3A"/><circle cx="50" cy="37" r="9" fill="#DAA520" stroke="#B8860B" stroke-width="2"/></svg>',
+    event_zhenguan: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><circle cx="78" cy="20" r="9" fill="#DAA520"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><rect x="20" y="36" width="60" height="22" fill="#C0392B"/><path d="M14 36 Q50 22 86 36 Z" fill="#2E4A6B"/><rect x="42" y="46" width="16" height="12" fill="#F5EFE0"/></svg>',
+    event_anshi: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="52" width="100" height="23" fill="#E7D9C0"/><rect x="0" y="42" width="100" height="12" fill="#7A6B52"/><g fill="#4A3F2E"><rect x="8" y="38" width="8" height="5"/><rect x="30" y="38" width="8" height="5"/><rect x="52" y="38" width="8" height="5"/><rect x="74" y="38" width="8" height="5"/></g><g fill="#9A9A9A"><path d="M34 42 q-6 -12 2 -20 q-4 10 2 20z" opacity="0.85"/><path d="M58 42 q-6 -12 2 -20 q-4 10 2 20z" opacity="0.85"/><path d="M76 42 q-5 -10 2 -16 q-3 8 2 16z" opacity="0.8"/></g></svg>',
+    event_xuanzang: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><path d="M0 56 L26 34 L46 56 Z" fill="#9AA7B0"/><path d="M40 56 L66 30 L92 56 Z" fill="#7A8A95"/><rect x="0" y="56" width="100" height="19" fill="#D8C9A8"/><circle cx="30" cy="44" r="6" fill="#E8C9A0" stroke="#4A3F2E"/><path d="M22 50 q8 -6 16 0 l3 6 h-22z" fill="#E0A93B"/><rect x="40" y="42" width="8" height="10" rx="2" fill="#7A6B52"/></svg>',
+    event_chenqiao: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><circle cx="50" cy="24" r="8" fill="#E8C9A0" stroke="#4A3F2E"/><path d="M40 18 q10 -8 20 0z" fill="#4A3F2E"/><path d="M36 34 q14 -6 28 0 l6 24 H30 Z" fill="#E8C44A" stroke="#B8860B"/><g fill="#C41E3A"><circle cx="50" cy="44" r="2.5"/></g><rect x="30" y="34" width="8" height="20" fill="#8B9BA8" stroke="#4A3F2E"/></svg>',
+    event_liyu: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><circle cx="76" cy="20" r="10" fill="#F3D98A"/><rect x="0" y="56" width="100" height="19" fill="#E7D9C0"/><path d="M28 40 L50 28 L72 40 Z" fill="#7A6B52"/><rect x="34" y="40" width="32" height="16" fill="#C9A86A" stroke="#8B7355"/><line x1="42" y1="40" x2="42" y2="56" stroke="#8B7355"/><line x1="58" y1="40" x2="58" y2="56" stroke="#8B7355"/><circle cx="50" cy="48" r="4" fill="#2C2416"/></svg>',
+    event_shijingtang: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><circle cx="34" cy="30" r="7" fill="#E8C9A0" stroke="#4A3F2E"/><path d="M26 40 q8 8 16 0 l4 16 h-24z" fill="#7A6B52" transform="rotate(-12 34 40)"/><rect x="60" y="40" width="30" height="20" rx="2" fill="#C9A86A" stroke="#8B7355"/><line x1="60" y1="50" x2="90" y2="50" stroke="#8B7355"/><line x1="75" y1="40" x2="75" y2="60" stroke="#8B7355"/></svg>',
+    event_beijiu: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><rect x="22" y="48" width="56" height="10" rx="2" fill="#7A6B52"/><g fill="#DAA520"><path d="M34 44 q4 -6 8 0 q0 4 -4 4 q-4 0 -4 -4z"/><path d="M58 44 q4 -6 8 0 q0 4 -4 4 q-4 0 -4 -4z"/></g><g stroke="#9A8A6A" stroke-width="1"><line x1="38" y1="40" x2="38" y2="44"/><line x1="62" y1="40" x2="62" y2="44"/></g></svg>',
+    event_jingkang: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="54" width="100" height="21" fill="#E7D9C0"/><rect x="0" y="40" width="40" height="16" fill="#7A6B52"/><rect x="64" y="40" width="36" height="16" fill="#7A6B52"/><g fill="#4A3F2E"><rect x="6" y="36" width="7" height="5"/><rect x="18" y="36" width="7" height="5"/><rect x="30" y="36" width="7" height="5"/><rect x="70" y="36" width="7" height="5"/><rect x="82" y="36" width="7" height="5"/></g><circle cx="54" cy="46" r="5" fill="#E8C9A0" stroke="#4A3F2E"/><path d="M48 52 q6 -5 12 0 l2 6 h-16z" fill="#2E4A6B"/><g stroke="#C41E3A" stroke-width="1.5"><line x1="50" y1="48" x2="44" y2="56"/><line x1="58" y1="48" x2="64" y2="56"/></g></svg>',
+    event_yuefei: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><circle cx="42" cy="26" r="8" fill="#E8C9A0" stroke="#4A3F2E"/><path d="M34 20 q8 -7 16 0z" fill="#8B9BA8"/><path d="M32 34 q10 -5 20 0 l5 24 H27 Z" fill="#8B9BA8" stroke="#4A3F2E"/><line x1="70" y1="14" x2="70" y2="58" stroke="#4A3F2E" stroke-width="2.5"/><rect x="70" y="16" width="16" height="20" fill="#C41E3A"/><text x="78" y="30" font-size="12" fill="#F5EFE0" text-anchor="middle" font-family="serif">岳</text></svg>',
+    event_chengjisi: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="58" width="100" height="17" fill="#DfE3C8"/><path d="M22 58 q-4 -16 8 -20 q4 -10 12 -4 q8 -6 12 4 q10 4 4 20z" fill="#7A6B52"/><rect x="32" y="30" width="16" height="10" rx="3" fill="#9A7B4F"/><circle cx="44" cy="26" r="6" fill="#E8C9A0" stroke="#4A3F2E"/><line x1="74" y1="14" x2="74" y2="56" stroke="#4A3F2E" stroke-width="2.5"/><path d="M74 16 L92 22 L74 28 Z" fill="#C41E3A"/></svg>',
+    event_hubilie: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="58" width="100" height="17" fill="#DfE3C8"/><path d="M22 58 q28 -36 56 0 z" fill="#FBF7EC" stroke="#8B7355" stroke-width="1.5"/><line x1="50" y1="34" x2="50" y2="58" stroke="#8B7355"/><line x1="74" y1="14" x2="74" y2="56" stroke="#4A3F2E" stroke-width="2.5"/><rect x="74" y="16" width="16" height="20" fill="#2E4A6B"/><text x="82" y="30" font-size="12" fill="#F5EFE0" text-anchor="middle" font-family="serif">元</text></svg>',
+    event_makeboluo: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><circle cx="44" cy="26" r="8" fill="#E8C9A0" stroke="#4A3F2E"/><path d="M33 20 q11 -10 22 0 q-2 5 -11 5 q-9 0 -11 -5z" fill="#C41E3A"/><path d="M34 34 q10 -5 20 0 l5 24 H29 Z" fill="#2E4A6B"/><circle cx="76" cy="44" r="10" fill="#FBF7EC" stroke="#4A3F2E" stroke-width="1.5"/><g stroke="#C41E3A" stroke-width="1.5"><line x1="76" y1="44" x2="76" y2="36"/><line x1="76" y1="44" x2="82" y2="48"/></g></svg>',
+    event_zhenghe: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="56" width="100" height="19" fill="#CFE0E6"/><path d="M0 60 q20 -4 40 0 t40 0 t20 0 v6 H0 Z" fill="#9FC2CF"/><path d="M22 56 L78 56 L70 46 L30 46 Z" fill="#7A4A2E"/><rect x="30" y="30" width="3" height="18" fill="#4A3F2E"/><rect x="50" y="24" width="3" height="24" fill="#4A3F2E"/><rect x="67" y="30" width="3" height="18" fill="#4A3F2E"/><path d="M33 32 L48 32 L48 44 L33 44 Z" fill="#FBF7EC" stroke="#C41E3A"/><path d="M53 26 L65 26 L65 44 L53 44 Z" fill="#FBF7EC" stroke="#C41E3A"/></svg>',
+    event_jingnan: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="54" width="100" height="21" fill="#E7D9C0"/><rect x="14" y="40" width="40" height="16" fill="#7A6B52"/><g fill="#4A3F2E"><rect x="18" y="36" width="7" height="5"/><rect x="30" y="36" width="7" height="5"/><rect x="42" y="36" width="7" height="5"/></g><g stroke="#2E4A6B" stroke-width="2.5" stroke-linecap="round"><line x1="60" y1="16" x2="82" y2="40"/><line x1="82" y1="16" x2="60" y2="40"/></g></svg>',
+    event_qijiguang: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="54" width="100" height="21" fill="#CFE0E6"/><path d="M0 58 q12 -6 24 0 t24 0 t24 0 t24 0 v6 H0 Z" fill="#9FC2CF"/><circle cx="40" cy="26" r="8" fill="#E8C9A0" stroke="#4A3F2E"/><path d="M32 20 q8 -7 16 0z" fill="#8B9BA8"/><path d="M30 34 q10 -5 20 0 l5 20 H25 Z" fill="#8B9BA8" stroke="#4A3F2E"/><rect x="58" y="34" width="4" height="20" fill="#C41E3A"/></svg>',
+    event_kangqian: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><circle cx="78" cy="20" r="9" fill="#DAA520"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><rect x="20" y="36" width="60" height="22" fill="#C0392B"/><path d="M14 36 Q50 22 86 36 Z" fill="#2E4A6B"/><rect x="42" y="46" width="16" height="12" fill="#F5EFE0"/></svg>',
+    event_yapian: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="54" width="100" height="21" fill="#CFE0E6"/><path d="M0 58 q12 -6 24 0 t24 0 t24 0 t24 0 v6 H0 Z" fill="#9FC2CF"/><path d="M26 54 L74 54 L66 44 L34 44 Z" fill="#4A3F2E"/><rect x="48" y="28" width="3" height="18" fill="#2C2416"/><path d="M51 30 L66 30 L66 44 L51 44 Z" fill="#2C2416"/><g fill="#9A9A9A"><path d="M40 44 q-5 -8 2 -14 q-3 8 2 14z" opacity="0.85"/><path d="M56 44 q-5 -8 2 -14 q-3 8 2 14z" opacity="0.85"/></g></svg>',
+    event_taiping: '<svg viewBox="0 0 100 75" preserveAspectRatio="xMidYMid meet"><rect width="100" height="75" fill="#F5EFE0"/><rect x="0" y="58" width="100" height="17" fill="#E7D9C0"/><line x1="50" y1="12" x2="50" y2="56" stroke="#4A3F2E" stroke-width="2.5"/><rect x="50" y="14" width="30" height="26" fill="#C41E3A"/><text x="65" y="33" font-size="16" fill="#F5EFE0" text-anchor="middle" font-family="serif">天</text><g fill="#2C2416"><circle cx="24" cy="50" r="5"/><circle cx="36" cy="52" r="5"/></g></svg>',
+  },
+};
+
+/* ---------------------- 3. 人物卡（3 卡连锁用，多事件 schema：eventIds[] 主，eventId 单值兼容回退） ---------------------- */
+const PERSON_CARDS = [
+  /* —— 原 26 人（保留 id / 朝代 / 关联事件，补充 eventIds 数组） —— */
+  { personId: 'person_kongzi', name: '孔子', dynastyId: 'dynasty_chunqiu', eventIds: ['event_kongzi'], eventId: 'event_kongzi', tagline: '至圣先师·周游列国' },
+  { personId: 'person_shangyang', name: '商鞅', dynastyId: 'dynasty_zhanguo', eventIds: ['event_shangyang'], eventId: 'event_shangyang', tagline: '变法图强·徙木立信' },
+  { personId: 'person_yingzheng', name: '秦始皇·嬴政', dynastyId: 'dynasty_qin', eventIds: ['event_tongyi', 'event_fenshu', 'event_changcheng'], eventId: 'event_tongyi', tagline: '千古一帝·横扫六合' },
+  { personId: 'person_zhangqian', name: '张骞', dynastyId: 'dynasty_xihan', eventIds: ['event_zhangqian'], eventId: 'event_zhangqian', tagline: '凿空西域·丝路先锋' },
+  { personId: 'person_li_shimin', name: '李世民', dynastyId: 'dynasty_tang', eventIds: ['event_zhenguan'], eventId: 'event_zhenguan', tagline: '贞观天子·从谏如流' },
+  { personId: 'person_xuanzang', name: '玄奘', dynastyId: 'dynasty_tang', eventIds: ['event_xuanzang'], eventId: 'event_xuanzang', tagline: '求法高僧·西行万里' },
+  { personId: 'person_zhaokuangyin', name: '赵匡胤', dynastyId: 'dynasty_wudai', eventIds: ['event_chenqiao'], eventId: 'event_chenqiao', tagline: '黄袍加身·陈桥兵变' },
+  { personId: 'person_yuefei', name: '岳飞', dynastyId: 'dynasty_song', eventIds: ['event_yuefei'], eventId: 'event_yuefei', tagline: '精忠报国·岳家铁军' },
+  { personId: 'person_chengjisi', name: '成吉思汗·铁木真', dynastyId: 'dynasty_yuan', eventIds: ['event_chengjisi'], eventId: 'event_chengjisi', tagline: '一代天骄·草原雄主' },
+  { personId: 'person_hubilie', name: '忽必烈', dynastyId: 'dynasty_yuan', eventIds: ['event_hubilie'], eventId: 'event_hubilie', tagline: '大元开国之君' },
+  { personId: 'person_zhenghe', name: '郑和', dynastyId: 'dynasty_ming', eventIds: ['event_zhenghe'], eventId: 'event_zhenghe', tagline: '七下西洋·宝船远航' },
+  { personId: 'person_qijiguang', name: '戚继光', dynastyId: 'dynasty_ming', eventIds: ['event_qijiguang'], eventId: 'event_qijiguang', tagline: '抗倭名将·戚家军魂' },
+  { personId: 'person_suiyangdi', name: '隋炀帝', dynastyId: 'dynasty_sui', eventIds: ['event_dayunhe'], eventId: 'event_dayunhe', tagline: '凿河通波·龙舟南巡' },
+  { personId: 'person_zhugeliang', name: '诸葛亮', dynastyId: 'dynasty_sanguo', eventIds: ['event_sangu'], eventId: 'event_sangu', tagline: '鞠躬尽瘁·卧龙先生' },
+  { personId: 'person_caocao', name: '曹操', dynastyId: 'dynasty_sanguo', eventIds: ['event_guandu'], eventId: 'event_guandu', tagline: '乱世枭雄·官渡破袁' },
+  { personId: 'person_banchao', name: '班超', dynastyId: 'dynasty_donghan', eventIds: ['event_banchao'], eventId: 'event_banchao', tagline: '投笔从戎·定远封侯' },
+  { personId: 'person_zhaokuangyin_beijiu', name: '赵匡胤', dynastyId: 'dynasty_song', eventIds: ['event_beijiu'], eventId: 'event_beijiu', tagline: '杯酒释兵权·温柔削藩' },
+  { personId: 'person_kangxi', name: '康熙帝', dynastyId: 'dynasty_qing', eventIds: ['event_kangqian'], eventId: 'event_kangqian', tagline: '康乾盛世·圣祖文治' },
+  { personId: 'person_sima_qian', name: '司马迁', dynastyId: 'dynasty_xihan', eventIds: ['event_shiji'], eventId: 'event_shiji', tagline: '忍辱负重著《史记》' },
+  { personId: 'person_cai_lun', name: '蔡伦', dynastyId: 'dynasty_donghan', eventIds: ['event_cailun'], eventId: 'event_cailun', tagline: '改进造纸术' },
+  { personId: 'person_wuzetian', name: '武则天', dynastyId: 'dynasty_tang', eventIds: ['event_wuzetian'], eventId: 'event_wuzetian', tagline: '一代女皇' },
+  { personId: 'person_libai', name: '李白', dynastyId: 'dynasty_tang', eventIds: ['event_libai'], eventId: 'event_libai', tagline: '诗仙' },
+  { personId: 'person_wanganshi', name: '王安石', dynastyId: 'dynasty_song', eventIds: ['event_wanganshi'], eventId: 'event_wanganshi', tagline: '改革名相' },
+  { personId: 'person_shenkuo', name: '沈括', dynastyId: 'dynasty_song', eventIds: ['event_shenkuo'], eventId: 'event_shenkuo', tagline: '博学大家' },
+  { personId: 'person_zhangjuzheng', name: '张居正', dynastyId: 'dynasty_ming', eventIds: ['event_zhangjuzheng'], eventId: 'event_zhangjuzheng', tagline: '救时宰相' },
+  { personId: 'person_sunzhongshan', name: '孙中山', dynastyId: 'dynasty_qing', eventIds: ['event_xinhai'], eventId: 'event_xinhai', tagline: '革命先行者' },
+  /* —— 新增约 38 人（按章节关键人物，多事件 schema） —— */
+  /* 第 1 章 商周 */
+  { personId: 'person_shangtang', name: '商汤', dynastyId: 'dynasty_shang', eventIds: ['event_shangtang', 'event_pangeng'], eventId: 'event_shangtang', tagline: '成汤革命·吊民伐罪' },
+  { personId: 'person_fuhao', name: '妇好', dynastyId: 'dynasty_shang', eventIds: ['event_fuhao', 'event_wuding'], eventId: 'event_fuhao', tagline: '巾帼战神·武丁配偶' },
+  { personId: 'person_wuwang', name: '周武王', dynastyId: 'dynasty_zhou', eventIds: ['event_muye', 'event_fengjian'], eventId: 'event_muye', tagline: '武王克商·牧野誓师' },
+  { personId: 'person_zhougong', name: '周公旦', dynastyId: 'dynasty_zhou', eventIds: ['event_zhougong_dongzheng', 'event_zhili'], eventId: 'event_zhougong_dongzheng', tagline: '周公吐哺·制礼作乐' },
+  /* 第 2 章 春秋战国 */
+  { personId: 'person_guanzhong', name: '管仲', dynastyId: 'dynasty_chunqiu', eventIds: ['event_guanzhong', 'event_zunwang'], eventId: 'event_guanzhong', tagline: '管仲相齐·尊王攘夷' },
+  { personId: 'person_goujian', name: '勾践', dynastyId: 'dynasty_chunqiu', eventIds: ['event_goujian'], eventId: 'event_goujian', tagline: '卧薪尝胆·越王勾践' },
+  { personId: 'person_zhaowuling', name: '赵武灵王', dynastyId: 'dynasty_zhanguo', eventIds: ['event_hufu'], eventId: 'event_hufu', tagline: '胡服骑射·赵武灵王' },
+  { personId: 'person_suqin', name: '苏秦', dynastyId: 'dynasty_zhanguo', eventIds: ['event_hezong'], eventId: 'event_hezong', tagline: '合纵抗秦·苏秦' },
+  { personId: 'person_zhangyi', name: '张仪', dynastyId: 'dynasty_zhanguo', eventIds: ['event_hezong'], eventId: 'event_hezong', tagline: '连横破纵·张仪' },
+  { personId: 'person_jingke', name: '荆轲', dynastyId: 'dynasty_zhanguo', eventIds: ['event_jingke'], eventId: 'event_jingke', tagline: '风萧水寒·荆轲刺秦' },
+  /* 第 3 章 秦汉 */
+  { personId: 'person_lishi', name: '李斯', dynastyId: 'dynasty_qin', eventIds: ['event_shutongwen', 'event_junxian'], eventId: 'event_shutongwen', tagline: '郡县书同文·李斯' },
+  { personId: 'person_mengtian', name: '蒙恬', dynastyId: 'dynasty_qin', eventIds: ['event_beiji_xiongnu', 'event_changcheng'], eventId: 'event_beiji_xiongnu', tagline: '北筑长城·蒙恬' },
+  { personId: 'person_hanwudi', name: '汉武帝', dynastyId: 'dynasty_xihan', eventIds: ['event_duzunrushu', 'event_weiqing', 'event_tuien'], eventId: 'event_duzunrushu', tagline: '汉武大帝·开疆拓土' },
+  { personId: 'person_weiqing', name: '卫青', dynastyId: 'dynasty_xihan', eventIds: ['event_weiqing'], eventId: 'event_weiqing', tagline: '龙城飞将·卫青' },
+  { personId: 'person_huohuobing', name: '霍去病', dynastyId: 'dynasty_xihan', eventIds: ['event_weiqing'], eventId: 'event_weiqing', tagline: '封狼居胥·霍去病' },
+  /* 第 4 章 汉晋 */
+  { personId: 'person_zhangheng', name: '张衡', dynastyId: 'dynasty_donghan', eventIds: ['event_zhangheng'], eventId: 'event_zhangheng', tagline: '科圣张衡·地动浑天' },
+  { personId: 'person_bangu', name: '班固', dynastyId: 'dynasty_donghan', eventIds: ['event_bangu'], eventId: 'event_bangu', tagline: '《汉书》之父·班固' },
+  { personId: 'person_zhouyu', name: '周瑜', dynastyId: 'dynasty_sanguo', eventIds: ['event_chibi', 'event_hefei'], eventId: 'event_chibi', tagline: '美周郎·赤壁火攻' },
+  { personId: 'person_simayi', name: '司马懿', dynastyId: 'dynasty_sanguo', eventIds: ['event_gaopingling', 'event_sanfen_guijin'], eventId: 'event_gaopingling', tagline: '冢虎司马·高平陵变' },
+  /* 第 5 章 隋唐 */
+  { personId: 'person_suiwendi', name: '隋文帝', dynastyId: 'dynasty_sui', eventIds: ['event_kaihuang_zhi', 'event_kaihuanglv'], eventId: 'event_kaihuang_zhi', tagline: '开皇之治·隋文帝' },
+  { personId: 'person_lichun', name: '李春', dynastyId: 'dynasty_sui', eventIds: ['event_zhaozhou'], eventId: 'event_zhaozhou', tagline: '匠师李春·赵州桥' },
+  { personId: 'person_tangxuanzong', name: '唐玄宗', dynastyId: 'dynasty_tang', eventIds: ['event_kaiyuan', 'event_anshi'], eventId: 'event_kaiyuan', tagline: '开元天宝·唐玄宗' },
+  { personId: 'person_wencheng', name: '文成公主', dynastyId: 'dynasty_tang', eventIds: ['event_wencheng'], eventId: 'event_wencheng', tagline: '和亲吐蕃·文成公主' },
+  { personId: 'person_jianzhen', name: '鉴真', dynastyId: 'dynasty_tang', eventIds: ['event_jianzhen'], eventId: 'event_jianzhen', tagline: '六渡东海·鉴真' },
+  /* 第 6 章 五代宋 */
+  { personId: 'person_zhuwen', name: '朱温', dynastyId: 'dynasty_wudai', eventIds: ['event_zhuwen'], eventId: 'event_zhuwen', tagline: '全忠篡唐·建后梁' },
+  { personId: 'person_hanxizai', name: '韩熙载', dynastyId: 'dynasty_wudai', eventIds: ['event_hanxizai'], eventId: 'event_hanxizai', tagline: '夜宴图主·韩熙载' },
+  { personId: 'person_fanzhongyan', name: '范仲淹', dynastyId: 'dynasty_song', eventIds: ['event_qingli'], eventId: 'event_qingli', tagline: '先忧后乐·范仲淹' },
+  { personId: 'person_zhuxi', name: '朱熹', dynastyId: 'dynasty_song', eventIds: ['event_zhuxi'], eventId: 'event_zhuxi', tagline: '理学集大成·朱熹' },
+  /* 第 7 章 元明清（上） */
+  { personId: 'person_guanhanqing', name: '关汉卿', dynastyId: 'dynasty_yuan', eventIds: ['event_guanhanqing'], eventId: 'event_guanhanqing', tagline: '曲圣关汉卿·窦娥冤' },
+  { personId: 'person_guoshoujing', name: '郭守敬', dynastyId: 'dynasty_yuan', eventIds: ['event_guoshoujing'], eventId: 'event_guoshoujing', tagline: '观象授时·郭守敬' },
+  { personId: 'person_yuqian', name: '于谦', dynastyId: 'dynasty_ming', eventIds: ['event_tumu'], eventId: 'event_tumu', tagline: '北京保卫战·于谦' },
+  { personId: 'person_li_zicheng', name: '李自成', dynastyId: 'dynasty_ming', eventIds: ['event_li_zicheng'], eventId: 'event_li_zicheng', tagline: '闯王李自成·甲申之变' },
+  /* 第 8 章 清及尾声 */
+  { personId: 'person_lin_zexu', name: '林则徐', dynastyId: 'dynasty_qing', eventIds: ['event_humen', 'event_yapian'], eventId: 'event_humen', tagline: '禁毒先驱·林则徐' },
+  { personId: 'person_zengguofan', name: '曾国藩', dynastyId: 'dynasty_qing', eventIds: ['event_taiping'], eventId: 'event_taiping', tagline: '湘军统领·曾国藩' },
+  { personId: 'person_lihongzhang', name: '李鸿章', dynastyId: 'dynasty_qing', eventIds: ['event_yangwu', 'event_jiawu'], eventId: 'event_yangwu', tagline: '洋务领袖·李鸿章' },
+  { personId: 'person_dengshichang', name: '邓世昌', dynastyId: 'dynasty_qing', eventIds: ['event_jiawu'], eventId: 'event_jiawu', tagline: '致远捐躯·邓世昌' },
+  { personId: 'person_yuanshikai', name: '袁世凯', dynastyId: 'dynasty_qing', eventIds: ['event_xinzheng', 'event_xuantong'], eventId: 'event_xinzheng', tagline: '北洋袁世凯' },
+  { personId: 'person_puyi', name: '溥仪', dynastyId: 'dynasty_qing', eventIds: ['event_xuantong'], eventId: 'event_xuantong', tagline: '末代皇帝·溥仪' },
+];
+
+/* =====================================================================
+ *  4. 纯逻辑函数（供 QA 在 Node 中调用，挂到 window.GameLogic）
+ * ===================================================================== */
+
+/** 返回事件所属朝代 id（在全部关卡中查找） */
+function findEventDynastyId(eventId, levels) {
+  for (const lvl of levels) {
+    const ev = lvl.eventCards.find((e) => e.id === eventId);
+    if (ev) return ev.dynastyId;
+  }
+  return null;
+}
+
+/** 朝代卡 + 事件卡 是否匹配 */
+function matchDynastyEvent(dynastyId, eventId, levels) {
+  const evDynasty = findEventDynastyId(eventId, levels);
+  return evDynasty !== null && evDynasty === dynastyId;
+}
+
+/** 2 卡配对得分（点卡） */
+function scoreForMatch() {
+  return 10;
+}
+
+/** 3 卡连锁得分（点卡，倍率 x2） */
+function scoreForChain() {
+  return 20;
+}
+
+/** Fisher-Yates 洗牌，返回新数组，不修改原数组 */
+function shuffle(array) {
+  const arr = array.slice();
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
+  }
+  return arr;
+}
+
+/** 验证 3 卡连锁：人物归属该朝代、人物对应此事件、事件归属该朝代 */
+function validateChain(dynastyId, personId, eventId, levels) {
+  const person = PERSON_CARDS.find((p) => p.personId === personId);
+  if (!person) return false;
+  if (person.dynastyId !== dynastyId) return false;
+  // 兼容多事件 schema：eventIds[] 优先，eventId 单值回退
+  if (!(person.eventIds || [person.eventId]).includes(eventId)) return false;
+  return matchDynastyEvent(dynastyId, eventId, levels);
+}
+
+/** 本章是否清空（所有事件卡都已配对）。兼容 Set 或数组入参 */
+function isChapterClear(pairedEventIds, level) {
+  if (!level || !level.eventCards) return false;
+  const set = pairedEventIds instanceof Set ? pairedEventIds : new Set(pairedEventIds || []);
+  return level.eventCards.every((e) => set.has(e.id));
+}
+
+/** 章节首次通关奖励点卡（每章仅一次 +50） */
+function computeLevelBonus(isFirstClear) {
+  return isFirstClear ? 50 : 0;
+}
+
+/** 比较两个卡的时间先后（基于 sortKey）：a 早返回 -1，b 早返回 1，相等返回 0 */
+function compareTimelineOrder(a, b) {
+  const ka = (a && a.sortKey != null) ? a.sortKey : 0;
+  const kb = (b && b.sortKey != null) ? b.sortKey : 0;
+  return ka < kb ? -1 : (ka > kb ? 1 : 0);
+}
+
+const GameLogic = {
+  matchDynastyEvent,
+  scoreForMatch,
+  scoreForChain,
+  shuffle,
+  validateChain,
+  isChapterClear,
+  computeLevelBonus,
+  findEventDynastyId,
+  // —— 时间线玩法（任务二）——
+  findEventById,
+  parsePeriodStart,
+  sortKeyOf,
+  isTimelineOrdered,
+  buildCardPool,
+  getTimelineCards,
+  compareTimelineOrder,
+  MOCK_LEVELS,
+  DYNASTY_TAGLINES,
+  PERSON_CARDS,
+};
+if (typeof window !== 'undefined') window.GameLogic = GameLogic;
+if (typeof globalThis !== 'undefined') globalThis.GameLogic = GameLogic;
+
+/* =====================================================================
+ *  5. 本地存储
+ * ===================================================================== */
+const LS_KEYS = {
+  dianka: 'huaxia_dianka',
+  best: 'huaxia_best_score',
+  cleared: 'huaxia_chapter_cleared',
+  lowpower: 'huaxia_lowpower',
+};
+
+const Storage = {
+  getNum(k, d) { const v = parseFloat(localStorage.getItem(k)); return isNaN(v) ? (d || 0) : v; },
+  setNum(k, v) { try { localStorage.setItem(k, String(v)); } catch (e) {} },
+  getJSON(k, d) { try { return JSON.parse(localStorage.getItem(k)) || d; } catch (e) { return d; } },
+  setJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+};
+
+/* =====================================================================
+ *  6. 游戏状态 + 渲染（仅在浏览器中运行）
+ * ===================================================================== */
+let state = null;
+let session = { totalScore: 0 };   // 本轮累计总分（章节模式跨章累加）
+let lowPower = false;
+let dynEls = {};   // dynastyId -> element
+let evtEls = {};   // eventId -> element
+let perEls = {};   // personId -> element
+const ITEM_COST = { hint: 15, clear: 10, shuffle: 20 };
+const ITEM_MAX = 3;
+const COMBO_BONUS = 5;
+
+const $ = (sel) => document.querySelector(sel);
+
+function newState(mode, chapterIndex, duration) {
+  return {
+    mode,
+    chapterIndex,
+    duration: duration || 0,
+    timeRemaining: duration || 0,
+    timerId: null,
+    currentLevel: MOCK_LEVELS[chapterIndex],
+    dynastyCards: [],
+    eventCards: [],
+    selectedDynastyId: null,
+    selectedPersonId: null,
+    selectedEventId: null,
+    pairedEventIds: new Set(),
+    score: 0,
+    dianka: Storage.getNum(LS_KEYS.dianka, 0),
+    combo: 0,
+    itemUsage: { hint: 0, clear: 0, shuffle: 0 },
+    locked: false,
+    busy: false,
+  };
+}
+
+/** 限时速配：随机 2 个朝代 + 相关约 20 个事件 */
+function buildTimedLevel() {
+  const allDynasties = MOCK_LEVELS.flatMap((l) => l.dynastyCards);
+  const allEvents = MOCK_LEVELS.flatMap((l) => l.eventCards);
+
+  // 1) 随机抽 2 个朝代，保证合计相关事件 ≥ 20；否则重新抽样（最多重试）
+  let dA = null;
+  let dB = null;
+  let related = [];
+  const MAX_TRIES = 30;
+  for (let t = 0; t < MAX_TRIES; t++) {
+    const pick = shuffle(allDynasties.slice());
+    dA = pick[0];
+    dB = pick[1];
+    related = allEvents.filter((e) => e.dynastyId === dA.id || e.dynastyId === dB.id);
+    if (related.length >= 20) break;
+  }
+  // 兜底：若抽样均不足 20（极少见），取最近一次抽样的全部相关事件
+  if (related.length === 0) related = allEvents.slice();
+
+  // 2) 优先保证两朝代各有代表：至少各取 6 张，余量随机补足至 20
+  const byA = shuffle(related.filter((e) => e.dynastyId === dA.id));
+  const byB = shuffle(related.filter((e) => e.dynastyId === dB.id));
+  const picked = [];
+  const NEED_EACH = 6;
+  for (let i = 0; i < Math.min(NEED_EACH, byA.length); i++) picked.push(byA[i]);
+  for (let i = 0; i < Math.min(NEED_EACH, byB.length); i++) picked.push(byB[i]);
+  const rest = shuffle(related.filter((e) => !picked.includes(e)));
+  for (let i = 0; i < rest.length && picked.length < 20; i++) picked.push(rest[i]);
+
+  return {
+    id: 'timed',
+    name: '限时速配·' + dA.name + dB.name,
+    dynastyCards: [dA, dB],
+    eventCards: picked,
+  };
+}
+
+/* ---------------------- 震动（移动端） ---------------------- */
+function vibrate(ms) {
+  if (lowPower) return;
+  if (typeof navigator !== 'undefined' && navigator.vibrate) {
+    try { navigator.vibrate(ms || 30); } catch (e) {}
+  }
+}
+
+/* ---------------------- 点卡 / 最高分 ---------------------- */
+function addDianka(delta) {
+  state.dianka = Math.max(0, state.dianka + delta);
+  Storage.setNum(LS_KEYS.dianka, state.dianka);
+  updateDiankaHUD();
+}
+function updateBest(score) {
+  const best = Storage.getNum(LS_KEYS.best, 0);
+  if (score > best) Storage.setNum(LS_KEYS.best, score);
+}
+
+/* ---------------------- 卡牌 DOM 构建（每局一次） ---------------------- */
+/* 图加载失败兜底：隐藏 img，并在卡片框内显示 emoji 占位，避免布局塌陷 */
+function imgFallback(img, emoji) {
+  if (!img) return;
+  img.style.display = 'none';
+  const parent = img.parentElement;
+  if (parent) {
+    parent.classList.add('no-img');
+    parent.setAttribute('data-emoji', emoji || '🏛️');
+  }
+}
+
+/* 年份格式化（事件卡 / 时间线显示用） */
+function formatYearFull(n) {
+  if (typeof n !== 'number' || isNaN(n)) return '';
+  return n < 0 ? '公元前' + (-n) + '年' : '公元' + n + '年';
+}
+function formatYear(n) {
+  if (typeof n !== 'number' || isNaN(n)) return '?';
+  return n < 0 ? '前' + (-n) : '' + n;
+}
+function kindLabel(kind) {
+  return kind === 'dynasty' ? '朝代' : kind === 'person' ? '人物' : '事件';
+}
+
+/** 生成「!」信息标记按钮，并阻止其触发卡牌根节点的拖拽 / 点击选择逻辑 */
+function createInfoBtn(kind, id) {
+  const btn = document.createElement('span');
+  btn.className = 'card-info-btn';
+  btn.textContent = '!';
+  btn.setAttribute('role', 'button');
+  btn.setAttribute('aria-label', '查看该卡背后的故事');
+  btn.addEventListener('pointerdown', (e) => { e.stopPropagation(); });
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    showCardStory(kind, id);
+  });
+  return btn;
+}
+
+function createDynastyCardEl(dynasty) {
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'dynasty-card';
+  el.dataset.id = dynasty.id;
+  const emoji = cardEmoji(dynasty.id, 'dynasty');
+  el.innerHTML =
+    '<span class="orn-bar top"></span>' +
+    '<span class="corner tl"></span><span class="corner tr"></span>' +
+    '<span class="corner bl"></span><span class="corner br"></span>' +
+    '<span class="card-chip">朝代</span>' +
+    '<div class="dyn-illu"><img class="card-img" draggable="false" src="assets/' + dynasty.id + '.png" alt="' + dynasty.name + '" onerror="imgFallback(this, \'' + emoji + '\')" /></div>' +
+    '<div class="dyn-name">' + dynasty.name + '</div>' +
+    '<span class="orn-bar bottom"></span>';
+  el.appendChild(createInfoBtn('dynasty', dynasty.id));
+  el.addEventListener('click', () => { if (el._suppressClick) { el._suppressClick = false; return; } handleDynastyClick(dynasty.id); });
+  attachDrag(el, 'dynasty', dynasty.id);
+  return el;
+}
+
+function createEventCardEl(event) {
+  const el = document.createElement('div');
+  el.className = 'event-card';
+  el.dataset.id = event.id;
+  const emoji = cardEmoji(event.id, 'event');
+  const chip = '事件';
+  el.innerHTML =
+    '<span class="evt-orn top"></span>' +
+    '<span class="card-chip">' + chip + '</span>' +
+    '<div class="evt-illu"><img class="card-img" draggable="false" src="assets/' + event.id + '.png" alt="' + event.name + '" onerror="imgFallback(this, \'' + emoji + '\')" /></div>' +
+    '<div class="evt-name">' + event.name + '</div>' +
+    '<span class="evt-orn bottom"></span>';
+  el.appendChild(createInfoBtn('event', event.id));
+  el.addEventListener('click', () => { if (el._suppressClick) { el._suppressClick = false; return; } handleEventClick(event.id); });
+  attachDrag(el, 'event', event.id);
+  return el;
+}
+
+function createPersonCardEl(person) {
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'person-card';
+  el.dataset.id = person.personId;
+  const emoji = cardEmoji(person.personId, 'person');
+  const chip = '人物';
+  el.innerHTML =
+    '<span class="card-chip">' + chip + '</span>' +
+    '<div class="per-illu"><img class="card-img" draggable="false" src="assets/' + person.personId + '.png" alt="' + person.name + '" onerror="imgFallback(this, \'' + emoji + '\')" /></div>' +
+    '<div class="pname">' + person.name + '</div>';
+  el.appendChild(createInfoBtn('person', person.personId));
+  el.addEventListener('click', () => { if (el._suppressClick) { el._suppressClick = false; return; } handlePersonClick(person.personId); });
+  attachDrag(el, 'person', person.personId);
+  return el;
+}
+
+/* ---------------------- 渲染本局 ---------------------- */
+function renderRound() {
+  const level = state.currentLevel;
+  state.dynastyCards = shuffle(level.dynastyCards.slice());
+  state.eventCards = shuffle(level.eventCards.slice());
+
+  const dynWrap = $('#dynasty-row');
+  dynWrap.innerHTML = '';
+  dynEls = {};
+  state.dynastyCards.forEach((d) => {
+    const el = createDynastyCardEl(d);
+    dynEls[d.id] = el;
+    dynWrap.appendChild(el);
+  });
+
+  const evtWrap = $('#event-grid');
+  evtWrap.innerHTML = '';
+  evtEls = {};
+  state.eventCards.forEach((e) => {
+    const el = createEventCardEl(e);
+    evtEls[e.id] = el;
+    evtWrap.appendChild(el);
+  });
+
+  perEls = {};
+  $('#person-row').innerHTML = '';
+  $('#person-row-wrap').hidden = true;
+
+  updateAllHUD();
+}
+
+/* ---------------------- 选择状态刷新 ---------------------- */
+function refreshSelectionUI() {
+  Object.entries(dynEls).forEach(([id, el]) => el.classList.toggle('selected', id === state.selectedDynastyId));
+  Object.entries(evtEls).forEach(([id, el]) => {
+    const visible = el.style.display !== 'none';
+    el.classList.toggle('selected', visible && id === state.selectedEventId);
+  });
+  Object.entries(perEls).forEach(([id, el]) => el.classList.toggle('selected', id === state.selectedPersonId));
+}
+
+/** 朝代选择变化后刷新人物行（仅展示该朝代的人物卡） */
+function refreshPersonRow() {
+  const wrap = $('#person-row');
+  const outer = $('#person-row-wrap');
+  perEls = {};
+  if (!state.selectedDynastyId) {
+    outer.hidden = true;
+    wrap.innerHTML = '';
+    return;
+  }
+  const persons = PERSON_CARDS.filter((p) => p.dynastyId === state.selectedDynastyId);
+  if (persons.length === 0) {
+    outer.hidden = true;
+    wrap.innerHTML = '';
+    return;
+  }
+  outer.hidden = false;
+  wrap.innerHTML = '';
+  persons.forEach((p) => {
+    const el = createPersonCardEl(p);
+    perEls[p.personId] = el;
+    wrap.appendChild(el);
+  });
+}
+
+/* ---------------------- 点击处理 ---------------------- */
+function handleDynastyClick(id) {
+  if (state.locked) return;
+  if (state.selectedDynastyId === id) {
+    state.selectedDynastyId = null;
+    state.selectedPersonId = null;
+  } else {
+    state.selectedDynastyId = id;
+    state.selectedPersonId = null;
+  }
+  refreshPersonRow();
+  refreshSelectionUI();
+  if (state.selectedDynastyId && state.selectedEventId) evaluate();
+}
+
+function handleEventClick(id) {
+  if (state.locked) return;
+  const el = evtEls[id];
+  if (!el || el.style.display === 'none') return;
+  if (state.selectedEventId === id) {
+    state.selectedEventId = null;
+  } else {
+    state.selectedEventId = id;
+  }
+  refreshSelectionUI();
+  if (state.selectedDynastyId && state.selectedEventId) evaluate();
+}
+
+function handlePersonClick(id) {
+  if (state.locked) return;
+  if (!state.selectedDynastyId) return; // 必须先选朝代
+  if (state.selectedPersonId === id) {
+    state.selectedPersonId = null;
+  } else {
+    state.selectedPersonId = id;
+  }
+  refreshSelectionUI();
+  if (state.selectedDynastyId && state.selectedPersonId && state.selectedEventId) evaluate();
+}
+
+/* ---------------------- 判定 ---------------------- */
+function evaluate() {
+  const d = state.selectedDynastyId;
+  const e = state.selectedEventId;
+  const p = state.selectedPersonId;
+  if (!d || !e) return;
+
+  if (p) {
+    // 3 卡连锁（主修复：人物多事件 schema 已让正确连锁通过）
+    if (GameLogic.validateChain(d, p, e, MOCK_LEVELS)) return onChainSuccess(d, p, e);
+    // 兜底：即便人物↔事件未对齐，只要朝代↔事件本身正确，绝不错杀（按 2 卡配对成功）
+    if (GameLogic.matchDynastyEvent(d, e, MOCK_LEVELS)) return onMatchSuccess(d, e);
+    return onChainFail(d, p, e);
+  }
+  // 2 卡配对
+  const ok = GameLogic.matchDynastyEvent(d, e, MOCK_LEVELS);
+  if (ok) onMatchSuccess(d, e);
+  else onMatchFail(d, e);
+}
+
+function lock() {
+  state.locked = true;
+  setTimeout(() => { state.locked = false; }, 400);
+}
+
+function onMatchSuccess(d, e) {
+  const reward = GameLogic.scoreForMatch(); // 10
+  state.score += reward;
+  addDianka(reward);
+  state.combo += 1;
+  maybeComboBonus();
+  state.pairedEventIds.add(e);
+  markEventSuccess(e);
+  floatText(e, '+' + reward, 'plus');
+  vibrate(30);
+  clearSelection();
+  updateScoreHUD();
+  checkChapterClear();
+}
+
+function onMatchFail(d, e) {
+  state.combo = 0;
+  const pen = 5;
+  addDianka(-pen);
+  shakeCards([d, e]);
+  floatText(e, '-' + pen, 'minus');
+  vibrate(40);
+  updateComboHUD();
+  clearSelection();
+  lock();
+}
+
+function onChainSuccess(d, p, e) {
+  const reward = GameLogic.scoreForChain(); // 20
+  state.score += reward;
+  addDianka(reward);
+  state.combo += 1;
+  maybeComboBonus();
+  state.pairedEventIds.add(e);
+  markEventSuccess(e);
+  floatText(e, '+' + reward, 'plus');
+  vibrate(30);
+  clearSelection();
+  updateScoreHUD();
+  checkChapterClear();
+}
+
+function onChainFail(d, p, e) {
+  state.combo = 0;
+  const pen = 5;
+  addDianka(-pen);
+  shakeCards([d, p, e]);
+  floatText(e, '-' + pen, 'minus');
+  vibrate(40);
+  updateComboHUD();
+  clearSelection();
+  lock();
+}
+
+function maybeComboBonus() {
+  if (state.combo > 0 && state.combo % 3 === 0) {
+    addDianka(COMBO_BONUS);
+    floatCombo('连击 +' + COMBO_BONUS);
+  }
+  updateComboHUD();
+}
+
+function clearSelection() {
+  state.selectedDynastyId = null;
+  state.selectedPersonId = null;
+  state.selectedEventId = null;
+  refreshPersonRow();
+  refreshSelectionUI();
+}
+
+/* ---------------------- 视觉反馈 ---------------------- */
+function markEventSuccess(eventId) {
+  const el = evtEls[eventId];
+  if (!el) return;
+  if (lowPower) {
+    el.classList.add('removing');
+    setTimeout(() => { el.style.display = 'none'; el.classList.remove('removing'); }, 320);
+  } else {
+    el.classList.add('success');
+    if (!lowPower) injectParticles(el);
+    setTimeout(() => el.classList.add('removing'), 300);
+    setTimeout(() => {
+      el.style.display = 'none';
+      el.classList.remove('success', 'removing');
+    }, 650);
+  }
+}
+
+function injectParticles(el) {
+  for (let i = 0; i < 4; i++) {
+    const p = document.createElement('span');
+    p.className = 'particle';
+    const dx = (Math.random() - 0.5) * 120;
+    const dy = (Math.random() - 0.5) * 120;
+    p.style.setProperty('--dx', dx + 'px');
+    p.style.setProperty('--dy', dy + 'px');
+    el.appendChild(p);
+    setTimeout(() => p.remove(), 520);
+  }
+}
+
+function shakeCards(ids) {
+  ids.forEach((id) => {
+    const el = dynEls[id] || evtEls[id] || perEls[id];
+    if (!el) return;
+    el.classList.add('shake');
+    setTimeout(() => el.classList.remove('shake'), 360);
+  });
+}
+
+function floatText(eventId, text, kind) {
+  const el = evtEls[eventId];
+  if (!el) return;
+  const f = document.createElement('div');
+  f.className = 'float-score ' + kind;
+  f.textContent = text;
+  el.appendChild(f);
+  setTimeout(() => f.remove(), 820);
+}
+
+function floatCombo(text) {
+  const comboLabel = $('#combo-label');
+  if (!comboLabel) return;
+  const f = document.createElement('div');
+  f.className = 'float-score plus';
+  f.style.position = 'static';
+  f.style.display = 'inline-block';
+  f.style.marginLeft = '6px';
+  f.textContent = text;
+  comboLabel.appendChild(f);
+  setTimeout(() => f.remove(), 820);
+}
+
+/* ---------------------- 道具 ---------------------- */
+function useItem(type) {
+  if (state.locked) return;
+  const cost = ITEM_COST[type];
+  if (state.itemUsage[type] >= ITEM_MAX) return;
+  if (state.dianka < cost) return;
+  addDianka(-cost);
+  state.itemUsage[type] += 1;
+  if (type === 'hint') doHint();
+  else if (type === 'clear') doClear();
+  else if (type === 'shuffle') doShuffle();
+  updateItemsHUD();
+}
+
+function doHint() {
+  // 找到一组未配对事件 + 其朝代，脉冲提示
+  const remaining = state.eventCards.filter((e) => !state.pairedEventIds.has(e.id) && evtEls[e.id] && evtEls[e.id].style.display !== 'none');
+  if (remaining.length === 0) return;
+  const target = remaining[Math.floor(Math.random() * remaining.length)];
+  const dynId = GameLogic.findEventDynastyId(target.id, MOCK_LEVELS);
+  const dEl = dynEls[dynId];
+  const eEl = evtEls[target.id];
+  if (dEl) { dEl.classList.add('hint'); setTimeout(() => dEl.classList.remove('hint'), 2000); }
+  if (eEl) { eEl.classList.add('hint'); setTimeout(() => eEl.classList.remove('hint'), 2000); }
+}
+
+function doClear() {
+  // 清空当前选择 + 错误/提示高亮
+  Object.values(dynEls).forEach((el) => el.classList.remove('hint', 'shake'));
+  Object.values(evtEls).forEach((el) => el.classList.remove('hint', 'shake'));
+  Object.values(perEls).forEach((el) => el.classList.remove('hint', 'shake'));
+  clearSelection();
+}
+
+function doShuffle() {
+  state.dynastyCards = GameLogic.shuffle(state.dynastyCards);
+  state.eventCards = GameLogic.shuffle(state.eventCards);
+  const dynWrap = $('#dynasty-row');
+  state.dynastyCards.forEach((d) => dynWrap.appendChild(dynEls[d.id]));
+  const evtWrap = $('#event-grid');
+  state.eventCards.forEach((e) => {
+    const el = evtEls[e.id];
+    if (el && el.style.display !== 'none') evtWrap.appendChild(el);
+  });
+}
+
+/* ---------------------- 章节 / 通关判定 ---------------------- */
+function checkChapterClear() {
+  if (state.busy) return;
+  if (GameLogic.isChapterClear(state.pairedEventIds, state.currentLevel)) {
+    state.busy = true;
+    setTimeout(() => {
+      if (state.mode === 'chapter') onChapterClear();
+      else onTimedClear();
+    }, 550);
+  }
+}
+
+function onChapterClear() {
+  const level = state.currentLevel;
+  const cleared = Storage.getJSON(LS_KEYS.cleared, []);
+  const isFirst = !cleared.includes(level.id);
+  const bonus = GameLogic.computeLevelBonus(isFirst);
+  if (isFirst) Storage.setJSON(LS_KEYS.cleared, cleared.concat(level.id));
+  if (bonus > 0) addDianka(bonus);
+
+  session.totalScore += state.score;
+  updateBest(session.totalScore);
+
+  const isLast = state.chapterIndex >= MOCK_LEVELS.length - 1;
+  if (isLast) showFinalSummary();
+  else showChapterClearPopup(level, bonus, isFirst);
+}
+
+function onTimedClear() {
+  stopTimer();
+  const timeBonus = Math.max(0, state.timeRemaining);
+  if (timeBonus > 0) addDianka(timeBonus);
+  updateBest(state.score);
+  showTimedPopup(true, timeBonus);
+}
+
+function onTimeUp() {
+  stopTimer();
+  if (GameLogic.isChapterClear(state.pairedEventIds, state.currentLevel)) {
+    onTimedClear();
+  } else {
+    updateBest(state.score);
+    showTimedPopup(false, 0);
+  }
+}
+
+/* ---------------------- 计时器（限时速配） ---------------------- */
+function startTimer(d) {
+  stopTimer();
+  state.timeRemaining = d;
+  updateTimerHUD();
+  state.timerId = setInterval(() => {
+    state.timeRemaining -= 1;
+    if (state.timeRemaining <= 0) {
+      state.timeRemaining = 0;
+      updateTimerHUD();
+      onTimeUp();
+    } else {
+      updateTimerHUD();
+    }
+  }, 1000);
+}
+function stopTimer() {
+  if (state && state.timerId) { clearInterval(state.timerId); state.timerId = null; }
+}
+
+/* ---------------------- HUD 刷新 ---------------------- */
+function updateAllHUD() {
+  updateScoreHUD();
+  updateDiankaHUD();
+  updateComboHUD();
+  updateTimerHUD();
+  updateItemsHUD();
+}
+function updateScoreHUD() { $('#score-label').textContent = state.score; }
+function updateDiankaHUD() { $('#dianka-label').textContent = state.dianka; }
+function updateComboHUD() {
+  const label = $('#combo-label');
+  if (state.combo > 1) {
+    label.hidden = false;
+    $('#combo-num').textContent = state.combo;
+  } else {
+    label.hidden = true;
+  }
+}
+function updateTimerHUD() {
+  if (state.mode !== 'timed') return;
+  $('#timer-num').textContent = state.timeRemaining;
+}
+function updateItemsHUD() {
+  ['hint', 'clear', 'shuffle'].forEach((type) => {
+    const used = state.itemUsage[type];
+    $('#used-' + type).textContent = '(' + used + '/' + ITEM_MAX + ')';
+    const btn = document.querySelector('.item-btn[data-item="' + type + '"]');
+    if (btn) btn.disabled = used >= ITEM_MAX || state.dianka < ITEM_COST[type];
+  });
+}
+
+/* ---------------------- 弹窗 ---------------------- */
+function showModal(html) {
+  const layer = $('#modal-layer');
+  layer.innerHTML = '<div class="modal-mask"><div class="modal">' + html + '</div></div>';
+}
+function closeModal() { $('#modal-layer').innerHTML = ''; }
+
+/** 卡牌「!」信息标记：展开该卡背后的更多故事（复用现有 showModal / #modal-layer） */
+function showCardStory(kind, id) {
+  const closeBtn = () => {
+    const c = document.getElementById('story-close');
+    if (c) c.addEventListener('click', closeModal);
+  };
+
+  if (kind === 'event') {
+    const ev = findEventById(id);
+    if (!ev) { showModal('<h2>暂无资料</h2><div class="modal-line">未找到该事件信息</div><div class="modal-btns"><button class="btn" id="story-close">关闭</button></div>'); closeBtn(); return; }
+    const yearTxt = (typeof ev.year === 'number') ? formatYearFull(ev.year) : (ev.period || '');
+    showModal(
+      '<div class="modal-icon">📜</div>' +
+      '<h2>' + ev.name + '</h2>' +
+      '<div class="modal-line">朝代：' + (DYNASTY_NAMES[ev.dynastyId] || '—') + '　·　' + yearTxt + '</div>' +
+      '<div class="modal-line" style="text-align:left">' + (ev.description || '（暂无更多故事）') + '</div>' +
+      '<div class="modal-btns"><button class="btn" id="story-close">知道了</button></div>'
+    );
+    closeBtn();
+    return;
+  }
+
+  if (kind === 'dynasty') {
+    let dynasty = null;
+    for (const lvl of MOCK_LEVELS) {
+      const d = lvl.dynastyCards.find((x) => x.id === id);
+      if (d) { dynasty = d; break; }
+    }
+    const name = DYNASTY_NAMES[id] || (dynasty ? dynasty.name : id);
+    const period = (dynasty && dynasty.period) ? dynasty.period : '—';
+    showModal(
+      '<div class="modal-icon">🏯</div>' +
+      '<h2>' + name + '</h2>' +
+      '<div class="modal-line">' + (DYNASTY_TAGLINES[id] || '') + '</div>' +
+      '<div class="modal-line">存续：' + period + '</div>' +
+      '<div class="modal-btns"><button class="btn" id="story-close">知道了</button></div>'
+    );
+    closeBtn();
+    return;
+  }
+
+  if (kind === 'person') {
+    const p = PERSON_CARDS.find((x) => x.personId === id);
+    if (!p) { showModal('<h2>暂无资料</h2><div class="modal-line">未找到该人物信息</div><div class="modal-btns"><button class="btn" id="story-close">关闭</button></div>'); closeBtn(); return; }
+    const dynName = DYNASTY_NAMES[p.dynastyId] || '';
+    showModal(
+      '<div class="modal-icon">👤</div>' +
+      '<h2>' + p.name + '</h2>' +
+      '<div class="modal-line">' + dynName + '</div>' +
+      '<div class="modal-line" style="text-align:left">' + (p.tagline || '（暂无更多故事）') + '</div>' +
+      '<div class="modal-btns"><button class="btn" id="story-close">知道了</button></div>'
+    );
+    closeBtn();
+    return;
+  }
+
+  if (kind === 'timeline') {
+    const card = (state && state.timelineCards) ? state.timelineCards.find((c) => c.id === id) : null;
+    if (card) { showCardStory(card.kind, card.id); return; }
+    showModal('<h2>暂无资料</h2><div class="modal-btns"><button class="btn" id="story-close">关闭</button></div>');
+    closeBtn();
+    return;
+  }
+
+  showModal('<h2>暂无资料</h2><div class="modal-btns"><button class="btn" id="story-close">关闭</button></div>');
+  closeBtn();
+}
+
+function showChapterClearPopup(level, bonus, isFirst) {
+  const bonusLine = bonus > 0
+    ? '<div class="modal-line">首次通关奖励点卡 <b>+' + bonus + '</b></div>'
+    : '';
+  showModal(
+    '<div class="modal-icon">🎉</div>' +
+    '<h2>本章通关</h2>' +
+    '<div class="modal-line">' + level.name + ' · 全部事件已配对</div>' +
+    '<div class="modal-line">本章得分 <b>' + state.score + '</b></div>' +
+    bonusLine +
+    '<div class="modal-line">当前点卡 <b>' + state.dianka + '</b></div>' +
+    '<div class="modal-btns">' +
+      '<button class="btn primary" id="m-next">下一章 →</button>' +
+      '<button class="btn" id="m-home">返回首页</button>' +
+    '</div>'
+  );
+  $('#m-next').addEventListener('click', () => { closeModal(); startChapterMode(state.chapterIndex + 1); });
+  $('#m-home').addEventListener('click', () => { closeModal(); goHome(); });
+}
+
+function showFinalSummary() {
+  showModal(
+    '<div class="modal-icon">👑</div>' +
+    '<h2>四海归一 · 通关</h2>' +
+    '<div class="modal-line">八章全部通关！</div>' +
+    '<div class="modal-line">总分 <b>' + session.totalScore + '</b></div>' +
+    '<div class="modal-line">点卡总额 <b>' + state.dianka + '</b></div>' +
+    '<div class="modal-btns">' +
+      '<button class="btn primary" id="m-home2">返回首页</button>' +
+    '</div>'
+  );
+  $('#m-home2').addEventListener('click', () => { closeModal(); goHome(); });
+}
+
+function showTimedPopup(success, timeBonus) {
+  const icon = success ? '⏱️' : '⌛';
+  const title = success ? '限时通关' : '时间到';
+  const bonusLine = success && timeBonus > 0
+    ? '<div class="modal-line">剩余时间奖励 <b>+' + timeBonus + '</b> 点卡</div>'
+    : '';
+  const sub = success
+    ? '全部事件已配对！'
+    : '未匹配完所有事件卡';
+  showModal(
+    '<div class="modal-icon">' + icon + '</div>' +
+    '<h2>' + title + '</h2>' +
+    '<div class="modal-line">' + sub + '</div>' +
+    '<div class="modal-line">本局得分 <b>' + state.score + '</b></div>' +
+    bonusLine +
+    '<div class="modal-line">点卡总额 <b>' + state.dianka + '</b></div>' +
+    '<div class="modal-btns">' +
+      '<button class="btn primary" id="m-retry">再来一局</button>' +
+      '<button class="btn" id="m-home3">返回首页</button>' +
+    '</div>'
+  );
+  $('#m-retry').addEventListener('click', () => { closeModal(); startTimedMode(state.duration); });
+  $('#m-home3').addEventListener('click', () => { closeModal(); goHome(); });
+}
+
+/* ---------------------- 模式启动 / 首页 ---------------------- */
+function showScreen(which) {
+  $('#home').hidden = (which !== 'home');
+  $('#game').hidden = (which !== 'game');
+  $('#timeline').hidden = (which !== 'timeline');
+  const memEl = document.getElementById('memory');
+  if (memEl) memEl.hidden = (which !== 'memory');
+}
+function showGameScreen() { showScreen('game'); }
+function showTimelineScreen() { showScreen('timeline'); }
+function showMemoryScreen() { showScreen('memory'); }
+function goHome() {
+  stopTimer();
+  state = null;
+  showScreen('home');
+  refreshHomeStats();
+}
+
+function startChapterMode(index) {
+  stopTimer();
+  if (index === 0) session.totalScore = 0;
+  state = newState('chapter', index, 0);
+  showGameScreen();
+  $('#mode-label').textContent = '章节 ' + (index + 1) + '/8 · ' + MOCK_LEVELS[index].name;
+  $('#timer-label').hidden = true;
+  renderRound();
+}
+
+function startTimedMode(duration) {
+  stopTimer();
+  session.totalScore = 0;
+  state = newState('timed', 0, duration);
+  state.currentLevel = buildTimedLevel();
+  showGameScreen();
+  const dynNames = state.currentLevel.dynastyCards.map((d) => d.name).join('');
+  $('#mode-label').textContent = '限时速配 ' + duration + 's · ' + dynNames;
+  $('#timer-label').hidden = false;
+  renderRound();
+  startTimer(duration);
+}
+
+/* =====================================================================
+ *  7. 历史时间线玩法（任务二）
+ * ===================================================================== */
+
+/** 在全部关卡中按 id 查找事件对象 */
+function findEventById(eventId) {
+  for (const lvl of MOCK_LEVELS) {
+    const ev = lvl.eventCards.find((e) => e.id === eventId);
+    if (ev) return ev;
+  }
+  return null;
+}
+
+/** 解析朝代 period 字符串的起始年（「公元前」取负） */
+function parsePeriodStart(period) {
+  if (!period || typeof period !== 'string') return 0;
+  const m = period.match(/(公元)?(前)?\s*(\d+)\s*年/);
+  if (!m) return 0;
+  const num = parseInt(m[3], 10);
+  const isBC = m[2] !== undefined;   // 含「前」
+  return isBC ? -num : num;
+}
+
+/** 返回任意卡的时间排序键（数字，越早越小） */
+function sortKeyOf(card) {
+  if (!card) return 0;
+  const kind = card.kind;
+  if (kind === 'dynasty') return parsePeriodStart(card.period);
+  if (kind === 'person') {
+    // 兼容多事件 schema：取 eventIds[0]（最早事件）解析年份，保证时间线可排
+    const evId = (card.eventIds && card.eventIds[0]) || card.eventId;
+    const ev = findEventById(evId);
+    if (ev) return typeof ev.year === 'number' ? ev.year : parsePeriodStart(String(ev.year));
+    return 0;
+  }
+  // event
+  if (typeof card.year === 'number') return card.year;
+  return parsePeriodStart(String(card.year));
+}
+
+/** 判定一组卡是否已按时间升序（允许相等，使用 <=） */
+function isTimelineOrdered(cards) {
+  if (!cards || cards.length < 2) return true;
+  for (let i = 1; i < cards.length; i++) {
+    if (cards[i].sortKey < cards[i - 1].sortKey) return false;
+  }
+  return true;
+}
+
+/** 构建全量卡池（13 朝代 + 全部事件 + 全部人物） */
+function buildCardPool() {
+  const pool = [];
+  MOCK_LEVELS.forEach((lvl) => {
+    lvl.dynastyCards.forEach((d) => pool.push({ id: d.id, kind: 'dynasty', name: d.name, period: d.period }));
+    lvl.eventCards.forEach((e) => pool.push({ id: e.id, kind: 'event', name: e.name, year: e.year }));
+  });
+  PERSON_CARDS.forEach((p) => pool.push({ id: p.personId, kind: 'person', name: p.name, eventId: (p.eventIds || [p.eventId])[0], eventIds: p.eventIds }));
+  pool.forEach((c) => {
+    c.sortKey = sortKeyOf(c);
+    c.img = 'assets/' + c.id + '.png';
+  });
+  return pool;
+}
+
+/** 从全量卡池随机抽 n 张（默认 5），返回打乱后的卡片对象 */
+function getTimelineCards(n) {
+  n = (typeof n === 'number' && n > 0) ? n : 5;
+  const pool = buildCardPool();
+  return shuffle(pool).slice(0, n).map((c) => ({
+    id: c.id, kind: c.kind, name: c.name, sortKey: c.sortKey, img: c.img,
+  }));
+}
+
+/* ---------------------- 时间线 UI ---------------------- */
+function startTimelineMode() {
+  stopTimer();
+  state = newState('timeline', 0, 0);
+  state.timelineCards = getTimelineCards(5);
+  state.timelineSelectedIdx = -1;
+  state.timelineSolved = false;
+  // 提示功能状态（集中初始化，避免改动 newState 工厂）
+  state.timelineHintsLeft = 2;
+  state.timelineHintActive = false;
+  state.timelineHintPicks = [];
+  showTimelineScreen();
+  const track = $('#tl-track');
+  if (track) track.classList.remove('active');
+  $('#tl-ticks').innerHTML = '';
+  updateTimelineHUD();
+  updateTimelineHintHUD();
+  drawTimeline();
+}
+
+function updateTimelineHUD() {
+  $('#tl-score').textContent = state ? state.score : 0;
+  $('#tl-dianka').textContent = state ? state.dianka : 0;
+}
+
+function createTimelineCardEl(card, idx) {
+  const el = document.createElement('div');
+  el.className = 'tl-card';
+  el.dataset.idx = idx;
+  const emoji = cardEmoji(card.id, card.kind);
+  el.innerHTML =
+    '<span class="card-chip">' + kindLabel(card.kind) + '</span>' +
+    '<div class="tl-illu"><img class="card-img" draggable="false" src="' + card.img + '" alt="' + card.name + '" onerror="imgFallback(this, \'' + emoji + '\')" /></div>' +
+    '<div class="tl-name">' + card.name + '</div>';
+  el.appendChild(createInfoBtn(card.kind, card.id));
+  el.addEventListener('click', () => { if (el._suppressClick) { el._suppressClick = false; return; } handleTimelineClick(idx); });
+  attachDrag(el, 'timeline', card.id);
+  return el;
+}
+
+function drawTimeline() {
+  const grid = $('#tl-grid');
+  grid.innerHTML = '';
+  state.timelineCards.forEach((c, idx) => {
+    const el = createTimelineCardEl(c, idx);
+    if (state.timelineSolved) el.classList.add('solved');
+    grid.appendChild(el);
+  });
+  if (state.timelineSelectedIdx >= 0 && grid.children[state.timelineSelectedIdx]) {
+    grid.children[state.timelineSelectedIdx].classList.add('selected');
+  }
+  if (state.timelineSolved) { renderTrack(); $('#tl-track').classList.add('active'); }
+}
+
+function handleTimelineClick(idx) {
+  if (!state || state.timelineSolved) return;
+  if (state.timelineHintActive) { handleTimelineHintPick(idx); return; }
+  if (state.timelineSelectedIdx === -1) {
+    state.timelineSelectedIdx = idx;
+  } else if (state.timelineSelectedIdx === idx) {
+    state.timelineSelectedIdx = -1;
+  } else {
+    const a = state.timelineSelectedIdx;
+    const arr = state.timelineCards;
+    const tmp = arr[a]; arr[a] = arr[idx]; arr[idx] = tmp;
+    state.timelineSelectedIdx = -1;
+    drawTimeline();
+    return;
+  }
+  const grid = $('#tl-grid');
+  Array.from(grid.children).forEach((el, i) => el.classList.toggle('selected', i === state.timelineSelectedIdx));
+}
+
+/** 清空提示模式的所有高亮（hint-mode 在网格容器、hint-pick 在卡上） */
+function clearHintHighlights() {
+  const grid = $('#tl-grid');
+  if (!grid) return;
+  Array.from(grid.children).forEach((el) => el.classList.remove('hint-pick'));
+  grid.classList.remove('hint-mode');
+}
+
+/** 提示模式下依次点两张卡，比较时间先后（不自动重排） */
+function handleTimelineHintPick(idx) {
+  if (state.timelineHintPicks.includes(idx)) {
+    // 再次点击同一张 → 取消该张拾取
+    state.timelineHintPicks = state.timelineHintPicks.filter((x) => x !== idx);
+    const grid = $('#tl-grid');
+    if (grid && grid.children[idx]) grid.children[idx].classList.remove('hint-pick');
+    return;
+  }
+  state.timelineHintPicks.push(idx);
+  const grid = $('#tl-grid');
+  if (grid && grid.children[idx]) grid.children[idx].classList.add('hint-pick');
+
+  if (state.timelineHintPicks.length === 2) {
+    const picks = state.timelineHintPicks;
+    const a = state.timelineCards[picks[0]];
+    const b = state.timelineCards[picks[1]];
+    const cmp = compareTimelineOrder(a, b);
+    const earlier = cmp <= 0 ? a : b;
+    const later = cmp <= 0 ? b : a;
+    showToast('💡「' + earlier.name + '」(' + formatYearFull(earlier.sortKey) + ') 早于「' + later.name + '」(' + formatYearFull(later.sortKey) + ')');
+    state.timelineHintsLeft -= 1;
+    state.timelineHintActive = false;
+    state.timelineHintPicks = [];
+    clearHintHighlights();
+    updateTimelineHintHUD();
+  }
+}
+
+/** 「提示」按钮：进入/取消提示拾取模式 */
+function onTimelineHint() {
+  if (!state || state.timelineSolved) return;
+  if (state.timelineHintsLeft <= 0) {
+    showToast('提示次数已用完');
+    return;
+  }
+  if (state.timelineHintActive) {
+    // 取消提示模式
+    state.timelineHintActive = false;
+    state.timelineHintPicks = [];
+    clearHintHighlights();
+    showToast('已取消提示');
+    return;
+  }
+  // 进入提示模式
+  state.timelineHintActive = true;
+  state.timelineHintPicks = [];
+  showToast('请依次点击两张卡牌，比较时间先后');
+  const grid = $('#tl-grid');
+  if (grid) {
+    grid.classList.add('hint-mode');
+    Array.from(grid.children).forEach((el) => el.classList.remove('hint-pick'));
+  }
+}
+
+/** 更新提示 HUD（剩余次数 + 禁用态） */
+function updateTimelineHintHUD() {
+  const leftEl = $('#tl-hint-left');
+  if (leftEl) leftEl.textContent = state ? state.timelineHintsLeft : 0;
+  const hintBtn = $('#tl-hint');
+  if (hintBtn) {
+    const disabled = !state || state.timelineSolved || state.timelineHintsLeft <= 0;
+    hintBtn.disabled = disabled;
+    hintBtn.classList.toggle('disabled', disabled);
+  }
+}
+
+function renderTrack() {
+  const ticks = $('#tl-ticks');
+  if (!ticks) return;
+  ticks.innerHTML = '';
+  const years = state.timelineCards.map((c) => c.sortKey);
+  const minY = Math.min.apply(null, years);
+  const maxY = Math.max.apply(null, years);
+  const span = (maxY - minY) || 1;
+  state.timelineCards.forEach((c) => {
+    const pct = ((c.sortKey - minY) / span) * 100;
+    const tick = document.createElement('div');
+    tick.className = 'tl-tick';
+    tick.style.left = (Math.max(2, Math.min(98, pct))) + '%';
+    tick.innerHTML = '<div class="tl-tick-dot"></div><div class="tl-tick-label"></div>';
+    ticks.appendChild(tick);
+  });
+}
+
+function checkTimeline() {
+  if (!state || state.timelineSolved) return;
+  if (isTimelineOrdered(state.timelineCards)) {
+    state.timelineSolved = true;
+    // 通关时清理可能残留的提示拾取状态
+    state.timelineHintActive = false;
+    state.timelineHintPicks = [];
+    clearHintHighlights();
+    const reward = 20;
+    state.score += reward;
+    addDianka(reward);
+    updateTimelineHUD();
+    updateTimelineHintHUD();
+    vibrate(30);
+    const grid = $('#tl-grid');
+    Array.from(grid.children).forEach((el) => {
+      el.classList.add('solved');
+      if (!lowPower) injectParticles(el);
+    });
+    renderTrack();
+    $('#tl-track').classList.add('active');
+    showTimelineSuccess();
+  } else {
+    const grid = $('#tl-grid');
+    Array.from(grid.children).forEach((el) => {
+      el.classList.add('shake');
+      setTimeout(() => el.classList.remove('shake'), 360);
+    });
+    vibrate(40);
+    showToast('顺序不对，再试试');
+  }
+}
+
+function showTimelineSuccess() {
+  showModal(
+    '<div class="modal-icon">🕰️</div>' +
+    '<h2>时序归位 · 成功</h2>' +
+    '<div class="modal-line">五张卡已按史实时间从早到晚排好</div>' +
+    '<div class="modal-line">奖励点卡 <b>+20</b></div>' +
+    '<div class="modal-btns">' +
+      '<button class="btn primary" id="m-tl-again">再来一局</button>' +
+      '<button class="btn" id="m-tl-home">返回首页</button>' +
+    '</div>'
+  );
+  $('#m-tl-again').addEventListener('click', () => { closeModal(); startTimelineMode(); });
+  $('#m-tl-home').addEventListener('click', () => { closeModal(); goHome(); });
+}
+
+let _toastEl = null;
+function showToast(msg) {
+  if (!_toastEl) {
+    _toastEl = document.createElement('div');
+    _toastEl.className = 'toast';
+    document.body.appendChild(_toastEl);
+  }
+  _toastEl.textContent = msg;
+  _toastEl.classList.add('show');
+  clearTimeout(_toastEl._timer);
+  _toastEl._timer = setTimeout(() => _toastEl.classList.remove('show'), 1600);
+}
+
+function refreshHomeStats() {
+  $('#home-best').textContent = Storage.getNum(LS_KEYS.best, 0);
+  $('#home-dianka').textContent = Storage.getNum(LS_KEYS.dianka, 0);
+  $('#lowpower-toggle').checked = !!Storage.getJSON(LS_KEYS.lowpower, false);
+}
+
+/* =====================================================================
+ *  8. 拖拽排序交互（任务四，零依赖 Pointer Events）
+ *  - 在四类卡上额外绑定 pointerdown；原 click 逻辑完全保留（阈值内走 click）。
+ *  - 位移 >= 6px 进入拖拽：生成跟随指针的 ghost；松手后按命中目标落定。
+ *  - 时间线：实时 reorderTimeline 重排 5 卡；配对：异类 = 选中源后 evaluate 目标，同类 = 交换视觉位置。
+ *  - 松手抑制误触 click（dragJustEnded 标志 + 捕获阶段 stopImmediatePropagation）。
+ * ===================================================================== */
+let dragState = null;
+let dragJustEnded = 0;   // 时间戳，用于抑制紧接着的 click
+
+function attachDrag(el, kind, id) {
+  if (!el) return;
+  el.style.touchAction = 'none';   // 防触屏滚动与拖拽冲突
+  el.addEventListener('pointerdown', (e) => onDragStart(e, el, kind, id));
+  // 兜底：拦截任何子元素（如 <img draggable>）触发的浏览器原生 HTML5 拖拽，
+  // 避免原生 drag 取消我们的自定义 pointer 拖拽手势，导致时间线/配对"拖了没反应"。
+  el.addEventListener('dragstart', (e) => e.preventDefault());
+}
+
+function kindOfEl(el) {
+  if (!el) return null;
+  if (el.classList.contains('dynasty-card')) return 'dynasty';
+  if (el.classList.contains('event-card')) return 'event';
+  if (el.classList.contains('person-card')) return 'person';
+  if (el.classList.contains('tl-card')) return 'timeline';
+  return null;
+}
+
+/* 捕获阶段抑制拖拽结束后紧跟的 click，避免误触 */
+function suppressDragClick(e) {
+  if (dragJustEnded && Date.now() - dragJustEnded < 300) {
+    dragJustEnded = 0;
+    e.stopImmediatePropagation();
+    e.preventDefault();
+  }
+}
+
+function onDragStart(e, el, kind, id) {
+  if (state && state.locked) return;
+  if (state && state.timelineHintActive) return;  // 提示模式下禁用拖拽，避免与拾取冲突
+  if (e.pointerType === 'mouse' && e.button !== 0) return;  // 仅左键 / 触摸 / 笔
+  dragState = {
+    el, kind, id,
+    startX: e.clientX, startY: e.clientY,
+    dragging: false, didDrag: false, ghost: null,
+    fromIdx: (kind === 'timeline' ? parseInt(el.dataset.idx, 10) : -1),
+  };
+  window.addEventListener('pointermove', onDragMove, true);
+  window.addEventListener('pointerup', onDragEnd, true);
+  window.addEventListener('pointercancel', onDragEnd, true);
+}
+
+function onDragMove(e) {
+  if (!dragState) return;
+  const dx = e.clientX - dragState.startX;
+  const dy = e.clientY - dragState.startY;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (!dragState.dragging) {
+    if (dist < 6) return;            // 阈值内视为点击，走原逻辑
+    dragState.dragging = true;
+    dragState.didDrag = true;
+    // 生成跟随指针的 ghost 克隆
+    const ghost = dragState.el.cloneNode(true);
+    ghost.classList.add('drag-ghost');
+    ghost.classList.remove('selected', 'solved');
+    ghost.style.width = dragState.el.offsetWidth + 'px';
+    ghost.style.height = dragState.el.offsetHeight + 'px';
+    ghost.style.left = (e.clientX - dragState.el.offsetWidth / 2) + 'px';
+    ghost.style.top = (e.clientY - dragState.el.offsetHeight / 2) + 'px';
+    document.body.appendChild(ghost);
+    dragState.ghost = ghost;
+    dragState.el.classList.add('dragging-source');
+  }
+  // 跟随指针
+  if (dragState.ghost) {
+    dragState.ghost.style.left = (e.clientX - dragState.el.offsetWidth / 2) + 'px';
+    dragState.ghost.style.top = (e.clientY - dragState.el.offsetHeight / 2) + 'px';
+  }
+  // 时间线：实时重排
+  if (dragState.kind === 'timeline') {
+    const tgt = document.elementFromPoint(e.clientX, e.clientY);
+    const cardEl = tgt && tgt.closest ? tgt.closest('.tl-card') : null;
+    if (cardEl) {
+      const to = parseInt(cardEl.dataset.idx, 10);
+      if (!isNaN(to) && to !== dragState.fromIdx) {
+        reorderTimeline(dragState.fromIdx, to);
+        dragState.fromIdx = to;     // 数组已重渲染，更新源索引
+      }
+    }
+  }
+}
+
+function onDragEnd(e) {
+  window.removeEventListener('pointermove', onDragMove, true);
+  window.removeEventListener('pointerup', onDragEnd, true);
+  window.removeEventListener('pointercancel', onDragEnd, true);
+  const ds = dragState;
+  dragState = null;
+  if (!ds) return;
+  if (ds.ghost && ds.ghost.parentNode) ds.ghost.parentNode.removeChild(ds.ghost);
+  if (ds.el) ds.el.classList.remove('dragging-source');
+  if (!ds.dragging) return;          // 未超阈值 → 正常 click，不拦截
+  // 拖拽发生：抑制紧接着的 click（仅一次）
+  dragJustEnded = Date.now();
+  if (ds.kind === 'timeline') {
+    state.timelineSelectedIdx = -1;
+    drawTimeline();                  // 清选中态，track/grid 结构不变
+  } else {
+    const tgt = document.elementFromPoint(e.clientX, e.clientY);
+    const cardEl = tgt && tgt.closest ? tgt.closest('.dynasty-card, .event-card, .person-card') : null;
+    if (cardEl) tryMatchByDrop(ds, cardEl);
+  }
+}
+
+/* 时间线拖拽重排（逻辑零改动，仅改 state.timelineCards 后重渲染） */
+function reorderTimeline(from, to) {
+  if (!state || !state.timelineCards) return;
+  const arr = state.timelineCards;
+  if (from < 0 || from >= arr.length || to < 0 || to >= arr.length) return;
+  const [m] = arr.splice(from, 1);
+  arr.splice(to, 0, m);
+  state.timelineSelectedIdx = to;
+  drawTimeline();
+}
+
+/* 配对拖拽：异类 → 选中源后对目标 evaluate；同类 → 视觉交换位置 */
+function tryMatchByDrop(src, tgtCardEl) {
+  const tgtId = tgtCardEl.dataset.id;
+  const tgtKind = kindOfEl(tgtCardEl);
+  const srcKind = src.kind;
+  if (srcKind === tgtKind) {          // 同类：仅交换视觉位置，不影响匹配正确性
+    swapCardsVisual(srcKind, src.id, tgtId);
+    return;
+  }
+  // 异类：由 src + tgt 推导 朝代 / 人物 / 事件 选择后 evaluate
+  let dyn = state.selectedDynastyId;
+  let per = state.selectedPersonId;
+  let evt = state.selectedEventId;
+  if (srcKind === 'dynasty') dyn = src.id; else if (tgtKind === 'dynasty') dyn = tgtId;
+  if (srcKind === 'event') evt = src.id; else if (tgtKind === 'event') evt = tgtId;
+  if (srcKind === 'person') per = src.id; else if (tgtKind === 'person') per = tgtId;
+  if (dyn && evt) {
+    state.selectedDynastyId = dyn;
+    state.selectedEventId = evt;
+    state.selectedPersonId = per;   // 可能为 null → 2 卡配对；或保留 → 3 卡连锁
+    refreshSelectionUI();
+    evaluate();
+  }
+}
+
+function swapInArray(arr, idA, idB) {
+  const i = arr.findIndex((x) => x.id === idA);
+  const j = arr.findIndex((x) => x.id === idB);
+  if (i >= 0 && j >= 0) { const t = arr[i]; arr[i] = arr[j]; arr[j] = t; }
+}
+
+function swapCardsVisual(kind, idA, idB) {
+  if (kind === 'dynasty') swapInArray(state.dynastyCards, idA, idB);
+  else if (kind === 'event') swapInArray(state.eventCards, idA, idB);
+  const wrap = kind === 'dynasty' ? $('#dynasty-row') : kind === 'event' ? $('#event-grid') : $('#person-row');
+  if (!wrap) return;
+  const esc = (window.CSS && CSS.escape) ? CSS.escape : (s) => s;
+  const a = wrap.querySelector('[data-id="' + esc(idA) + '"]');
+  const b = wrap.querySelector('[data-id="' + esc(idB) + '"]');
+  if (!a || !b) return;
+  // DOM 交换（相邻 / 非相邻均安全）
+  const aNext = a.nextSibling;
+  const bNext = b.nextSibling;
+  if (aNext === b) { wrap.insertBefore(b, a); }
+  else if (bNext === a) { wrap.insertBefore(a, b); }
+  else {
+    wrap.insertBefore(b, aNext);
+    wrap.insertBefore(a, bNext);
+  }
+}
+
+/* =========================================================
+ *  记忆时序闯关（朝代学宫）—— 记忆 + 时序排序混合玩法
+ *  全部状态收进 Mem 对象，全部函数加 mem 前缀，避免污染全局命名空间。
+ *  核心闭环：翻两张记牌 → 回想更早 → 选对锁定/选错红框 → 进度/连击/通关。
+ * ========================================================= */
+const Mem = {
+  ph: 0,            // 阶段：0 等待第一张 / 1 第一张展示中 / 2 等待第二张
+                    //        / 3 第二张展示中 / 4 回想（等点选更早）/ 5 已判定（待弹窗）
+  deck: [],         // 网格顺序的卡 id 数组（已洗牌）
+  deckIds: [],      // 本局抽到的 18 张卡对象（按 id 查表）
+  doneIds: [],      // 已锁定（已完成）的卡 id
+  picked: [],       // 本轮已翻看的两张卡 id
+  score: { r: 0, w: 0 },
+  streak: 0,
+  bestStreak: 0,
+  rd: 0,            // 当前第几对
+  ach: {},          // 已触发的连击里程碑
+  rdToken: 0,       // 轮次令牌，用于作废过期定时器
+  ansTimer: 0,      // 翻牌定时器句柄
+  toastTimer: 0,    // toast 定时器句柄
+  recallStart: 0,   // 进入回想阶段的时间戳（用于用时评语）
+};
+
+let _memUid = 0;
+/** 生成唯一 DOM id（替代外部 id()，避免与项目潜在同名全局冲突） */
+function memId(prefix) {
+  _memUid += 1;
+  return (prefix || 'mem') + '-' + _memUid;
+}
+/** 局部 Fisher-Yates 洗牌（不调用项目可能不存在的全局 shuffle 命名） */
+function memShuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+function memCssEsc(s) {
+  return (typeof window !== 'undefined' && window.CSS && window.CSS.escape) ? window.CSS.escape(s) : ('' + s);
+}
+function memIsDone(id) { return Mem.doneIds.indexOf(id) >= 0; }
+function memLiveCnt() { return (Mem.deck.length || 0) - Mem.doneIds.length; }
+function memCardById(id) {
+  for (let i = 0; i < Mem.deckIds.length; i++) {
+    if (Mem.deckIds[i].id === id) return Mem.deckIds[i];
+  }
+  return null;
+}
+
+/**
+ * 从全部事件卡中随机抽取 n 张（默认 18），映射为玩法卡对象。
+ * 字段映射：t←name, e←DYNASTY_NAMES[dynastyId], s←description, y←year, img←'assets/<id>.png'
+ * 仅保留 typeof year === 'number' 的卡；不足 n 时取全部。
+ */
+function memDrawCards(n) {
+  n = (typeof n === 'number' && n > 0) ? n : 18;
+  const all = [];
+  MOCK_LEVELS.forEach((lvl) => {
+    (lvl.eventCards || []).forEach((e) => {
+      if (typeof e.year !== 'number') return;
+      all.push({
+        id: e.id,
+        t: e.name,
+        e: DYNASTY_NAMES[e.dynastyId] || '',
+        s: e.description || '',
+        y: e.year,
+        d: e.dynastyId,
+        img: 'assets/' + e.id + '.png',
+      });
+    });
+  });
+  return memShuffle(all).slice(0, n);
+}
+
+/** 启动记忆时序模式（顶层函数，供首页入口与 reset-btn 调用） */
+function startMemoryMode() {
+  stopTimer();
+  state = newState('memory', 0, 0);
+  showMemoryScreen();
+  memInitGame();
+}
+
+/** 初始化 / 重开一局 */
+function memInitGame() {
+  const overlay = $('#mem-modal-overlay');
+  if (overlay) overlay.hidden = true;
+  memHideBanner();
+  Mem.rdToken += 1;
+  Mem.deckIds = memDrawCards(18);
+  Mem.deck = memShuffle(Mem.deckIds.map((c) => c.id));
+  Mem.doneIds = [];
+  Mem.picked = [];
+  Mem.score = { r: 0, w: 0 };
+  Mem.streak = 0;
+  Mem.bestStreak = 0;
+  Mem.rd = 0;
+  Mem.ach = {};
+  Mem.ph = 0;
+  memRebuildGrid();
+  memUpScore();
+  memUpProg();
+}
+
+/** 重建 6×3 卡网格（18 张） */
+function memRebuildGrid() {
+  const grid = $('#mem-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  Mem.deck.forEach((id, index) => {
+    const c = memCardById(id);
+    const emoji = (c && DYNASTY_EMOJI[c.d]) ? DYNASTY_EMOJI[c.d] : '🏛️';
+    const slot = document.createElement('div');
+    slot.className = 'card-slot';
+    slot.dataset.id = id;
+    slot.id = memId('slot');
+    slot.style.setProperty('--i', index);
+    slot.innerHTML =
+      '<div class="card-inner">' +
+        '<div class="card-face card-back"><img class="card-back-img" src="assets/card-back.png" alt="卡背"></div>' +
+        '<div class="card-face card-front">' +
+          '<img class="card-img" src="' + c.img + '" alt="' + c.t + '" draggable="false" ' +
+            'onerror="imgFallback(this, \'' + emoji + '\')">' +
+          '<div class="card-name">' + c.t + '</div>' +
+        '</div>' +
+      '</div>';
+    slot.querySelector('.card-front').appendChild(createInfoBtn('event', id));
+    slot.addEventListener('click', () => memOnClick(id));
+    grid.appendChild(slot);
+  });
+}
+
+/** 翻牌（on=true 翻到正面，false 翻回背面） */
+function memFlip(id, on) {
+  const slot = document.querySelector('#memory .card-slot[data-id="' + memCssEsc(id) + '"]');
+  if (slot) slot.classList.toggle('flipped', !!on);
+}
+/** 标记状态类（done / wrong / ans-hint） */
+function memMark(id, cls, on) {
+  const slot = document.querySelector('#memory .card-slot[data-id="' + memCssEsc(id) + '"]');
+  if (slot) slot.classList.toggle(cls, !!on);
+}
+
+/** 点击卡牌：根据阶段推进游戏 */
+function memOnClick(id) {
+  if (Mem.ph === 0) {
+    // 等待第一张
+    if (memIsDone(id) || Mem.picked.indexOf(id) >= 0) return;
+    Mem.picked = [id];
+    Mem.ph = 1;
+    memFlip(id, true);
+    const token = Mem.rdToken;
+    Mem.ansTimer = setTimeout(() => {
+      if (token !== Mem.rdToken) return;
+      memFlip(id, false);
+      Mem.ph = 2;
+    }, 1200);
+  } else if (Mem.ph === 2) {
+    // 等待第二张
+    if (memIsDone(id) || Mem.picked.indexOf(id) >= 0) return;
+    Mem.picked.push(id);
+    Mem.ph = 3;
+    memFlip(id, true);
+    const token = Mem.rdToken;
+    Mem.ansTimer = setTimeout(() => {
+      if (token !== Mem.rdToken) return;
+      memFlip(id, false);
+      Mem.ph = 4;
+      Mem.recallStart = Date.now();
+      memBanner('🧠', '回想阶段', '哪张卡的事件更早？', '凭记忆点选时间更早的那张');
+    }, 1200);
+  } else if (Mem.ph === 4) {
+    // 回想阶段：只能点选本轮翻看的两张之一作为「更早」的猜测
+    if (Mem.picked.indexOf(id) < 0) return;
+    memResolve(id);
+  }
+  // 其余阶段（1/3/5）忽略点击，避免打断翻牌与判定
+}
+
+/** 判定猜测：比较两轮翻看卡的事件年份 */
+function memResolve(guessId) {
+  Mem.ph = 5;
+  const a = memCardById(Mem.picked[0]);
+  const b = memCardById(Mem.picked[1]);
+  if (!a || !b) return;
+  const earlier = (a.y < b.y) ? a.id : b.id;
+  const correct = (guessId === earlier);
+  const elapsed = Date.now() - (Mem.recallStart || Date.now());
+  // 揭示两张卡正面，供玩家对照
+  memFlip(a.id, true);
+  memFlip(b.id, true);
+  if (correct) {
+    Mem.score.r += 1;
+    Mem.streak += 1;
+    if (Mem.streak > Mem.bestStreak) Mem.bestStreak = Mem.streak;
+    Mem.doneIds.push(a.id, b.id);
+    memMark(a.id, 'done', true);
+    memMark(b.id, 'done', true);
+    memCheckAch();
+  } else {
+    Mem.score.w += 1;
+    Mem.streak = 0;
+    memMark(guessId, 'wrong', true);       // 错误卡红框
+    memMark(earlier, 'ans-hint', true);    // 正确答案绿框高亮
+  }
+  memUpScore();
+  memUpProg();
+  const diff = Math.abs(a.y - b.y);
+  memShowModal(correct, a, b, earlier, guessId, diff, elapsed);
+}
+
+/** 继续进入下一对（由弹窗按钮动态绑定） */
+function memContinuePair() {
+  // 清理本轮结果高亮（已锁定的 done 卡保留）
+  Mem.picked.forEach((id) => {
+    if (!memIsDone(id)) {
+      memFlip(id, false);
+      memMark(id, 'wrong', false);
+      memMark(id, 'ans-hint', false);
+    }
+  });
+  memHideBanner();
+  Mem.picked = [];
+  Mem.rdToken += 1;
+  const overlay = $('#mem-modal-overlay');
+  if (overlay) overlay.hidden = true;
+  if (Mem.doneIds.length >= (Mem.deck.length || 18)) {
+    memVictory();
+  } else {
+    Mem.ph = 0;
+  }
+}
+
+/** 展示结果弹窗 */
+function memShowModal(correct, a, b, earlier, guessId, diff, elapsed) {
+  const overlay = $('#mem-modal-overlay');
+  const aInfo = a.t + '（' + a.e + '·' + formatYearFull(a.y) + '）';
+  const bInfo = b.t + '（' + b.e + '·' + formatYearFull(b.y) + '）';
+  const earlierInfo = (earlier === a.id) ? aInfo : bInfo;
+  $('#mem-mI').textContent = correct ? '✅' : '❌';
+  $('#mem-mT').textContent = correct ? '答对了！' : '答错了';
+  $('#mem-mB').innerHTML =
+    '更早的是：<b>' + earlierInfo + '</b><br/>' +
+    aInfo + '<br/>' + bInfo;
+  const diffText = '两事件相差 ' + diff.toLocaleString('en-US') + ' 年';
+  const comment = memTimeComment(elapsed);
+  $('#mem-mD').innerHTML = diffText + '<br/>' + comment + ' 连击 x' + Mem.streak;
+  const btns = $('#mem-mBtns');
+  btns.innerHTML = '';
+  const btn = document.createElement('button');
+  btn.className = 'btn primary';
+  btn.textContent = '继续 →';
+  btn.onclick = memContinuePair;
+  btns.appendChild(btn);
+  overlay.hidden = false;
+}
+
+/** 通关结算页 */
+function memVictory() {
+  const total = Mem.score.r + Mem.score.w;
+  const acc = total > 0 ? Math.round((Mem.score.r / total) * 100) : 0;
+  const stars = Mem.score.w === 0 ? 3 : (acc >= 80 ? 2 : 1);
+  const starStr = '★★★'.slice(0, stars) + '☆☆☆'.slice(0, 3 - stars);
+  const overlay = $('#mem-modal-overlay');
+  $('#mem-mI').textContent = '🏆';
+  $('#mem-mT').textContent = '通关结算';
+  $('#mem-mB').innerHTML =
+    '正确 <b>' + Mem.score.r + '</b> · 错误 <b>' + Mem.score.w + '</b><br/>' +
+    '准确率 <b>' + acc + '%</b> · 最长连击 <b>' + Mem.bestStreak + '</b>';
+  $('#mem-mD').innerHTML = '评级 ' + starStr;
+  const btns = $('#mem-mBtns');
+  btns.innerHTML = '';
+  const again = document.createElement('button');
+  again.className = 'btn primary';
+  again.textContent = '再来一局';
+  again.onclick = memResetGame;
+  btns.appendChild(again);
+  const home = document.createElement('button');
+  home.className = 'btn';
+  home.textContent = '返回首页';
+  home.onclick = goHome;
+  btns.appendChild(home);
+  overlay.hidden = false;
+}
+
+/** 重开本模式 */
+function memResetGame() { memInitGame(); }
+
+/* ---------- HUD / 横幅 / toast ---------- */
+function memUpScore() {
+  $('#mem-scoreR').textContent = Mem.score.r;
+  $('#mem-scoreW').textContent = Mem.score.w;
+  $('#mem-streakN').textContent = Mem.streak;
+  const total = Mem.score.r + Mem.score.w;
+  const acc = total > 0 ? Math.round((Mem.score.r / total) * 100) : 0;
+  $('#mem-accN').textContent = acc + '%';
+}
+function memUpProg() {
+  const total = Mem.deck.length || 18;
+  const done = Mem.doneIds.length;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  $('#mem-prog-fill').style.width = pct + '%';
+  $('#mem-prog-text').textContent = done + ' / ' + total;
+}
+function memBanner(icon, title, sub, comment) {
+  const b = $('#mem-banner');
+  $('#mem-bI').textContent = icon;
+  $('#mem-bT').textContent = title;
+  $('#mem-bS').textContent = sub;
+  $('#mem-bC').textContent = comment || '';
+  b.hidden = false;
+}
+function memHideBanner() {
+  const b = $('#mem-banner');
+  if (b) b.hidden = true;
+}
+/** 连击里程碑成就 */
+function memCheckAch() {
+  const milestones = [3, 5, 10];
+  milestones.forEach((m) => {
+    if (Mem.streak >= m && !Mem.ach[m]) {
+      Mem.ach[m] = true;
+      memToast('🔥', '连击里程碑', '连击 x' + m + '！');
+    }
+  });
+}
+function memToast(icon, title, sub) {
+  const t = $('#mem-toast');
+  $('#mem-tI').textContent = icon;
+  $('#mem-tT').textContent = title;
+  $('#mem-tS').textContent = sub;
+  t.hidden = false;
+  if (Mem.toastTimer) clearTimeout(Mem.toastTimer);
+  Mem.toastTimer = setTimeout(() => { t.hidden = true; }, 2200);
+}
+/** 用时评语（回想阶段耗时 → 文案） */
+function memTimeComment(ms) {
+  const s = ms / 1000;
+  if (s < 1.2) return '反应神速 ⚡';
+  if (s < 3) return '思路清晰 👍';
+  if (s < 6) return '深思熟虑 🤔';
+  return '稳扎稳打 🐢';
+}
+
+/* 暴露给 QA（便于在 Node 中调用抽卡逻辑） */
+if (typeof window !== 'undefined') {
+  window.Mem = Mem;
+  window.memDrawCards = memDrawCards;
+}
+
+/* ---------------------- 初始化（仅浏览器） ---------------------- */
+function init() {
+  lowPower = !!Storage.getJSON(LS_KEYS.lowpower, false);
+  refreshHomeStats();
+
+  $('#mode-chapter').addEventListener('click', () => startChapterMode(0));
+  document.querySelectorAll('#mode-timed .pill').forEach((pill) => {
+    pill.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      startTimedMode(parseInt(pill.dataset.dur, 10));
+    });
+  });
+
+  $('#back-btn').addEventListener('click', goHome);
+  $('#reset-btn').addEventListener('click', () => {
+    if (!state) return;
+    if (state.mode === 'chapter') startChapterMode(state.chapterIndex);
+    else if (state.mode === 'timeline') startTimelineMode();
+    else if (state.mode === 'memory') startMemoryMode();
+    else startTimedMode(state.duration);
+  });
+
+  document.querySelectorAll('.item-btn').forEach((btn) => {
+    btn.addEventListener('click', () => useItem(btn.dataset.item));
+  });
+
+  $('#mode-timeline').addEventListener('click', () => startTimelineMode());
+  $('#tl-back').addEventListener('click', goHome);
+  $('#tl-check').addEventListener('click', checkTimeline);
+  $('#tl-hint').addEventListener('click', onTimelineHint);
+  $('#tl-restart').addEventListener('click', () => startTimelineMode());
+
+  /* 记忆时序（朝代学宫）入口与屏幕内按钮 */
+  $('#mode-memory').addEventListener('click', () => startMemoryMode());
+  $('#mem-back').addEventListener('click', goHome);
+  $('#mem-restart').addEventListener('click', memResetGame);
+
+  $('#lowpower-toggle').addEventListener('change', (e) => {
+    lowPower = e.target.checked;
+    Storage.setJSON(LS_KEYS.lowpower, lowPower);
+  });
+
+  // 任务四：拖拽结束后抑制误触 click（捕获阶段拦截，不影响键盘 Enter/Space 触发 click）
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('click', suppressDragClick, true);
+  }
+}
+
+if (typeof document !== 'undefined') {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+}
+</script>
+</body>
+</html>
